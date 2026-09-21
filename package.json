@@ -1,0 +1,30 @@
+{
+  "name": "cc-nbproject",
+  "version": "0.1.0",
+  "description": "本地反向代理 + 桌面控制台：为 Claude Code 提供零重启的供应商切换",
+  "main": "src/main/index.js",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "postinstall": "node node_modules/electron/install.js"
+  },
+  "keywords": [
+    "claude-code",
+    "proxy",
+    "electron",
+    "llm-router"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.8"
+  }
+}

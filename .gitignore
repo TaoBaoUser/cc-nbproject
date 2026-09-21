@@ -1,0 +1,32 @@
+# --- 依赖 ---
+node_modules/
+
+# --- 构建产物 ---
+dist/
+out/
+build/
+*.asar
+
+# --- 敏感信息：绝不允许进入仓库 ---
+# 供应商配置里含有真实 API key，运行时存放在用户目录（~/.cc-nbproject/），
+# 这里再加一层兜底，防止有人把本地副本放进项目目录后误提交。
+.env
+.env.*
+*.key
+profiles.json
+profiles.local.json
+usage.jsonl
+secrets/
+credentials/
+**/settings.json.bak.*
+
+# --- 编辑器 / 系统 ---
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# --- 日志 ---
+*.log
+npm-debug.log*
+logs/
