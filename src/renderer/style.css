@@ -488,6 +488,20 @@ h1 {
   z-index: 100;
 }
 
+/*
+ * ⚠️ 这一条不能删。
+ *
+ * HTML 的 hidden 属性靠 UA 样式表里的 `display: none` 生效，而作者样式表
+ * 的优先级高于 UA 样式表 —— 上面那条 `display: flex` 会把它完全压掉。
+ * 结果就是：明明标了 hidden，遮罩层却始终铺在界面上，拦截全部点击，
+ * 表现为「界面发暗、什么都点不了」。
+ *
+ * 必须显式把 [hidden] 的 display 写回来。
+ */
+.modal-root[hidden] {
+  display: none;
+}
+
 .modal {
   width: 100%;
   max-width: 560px;
