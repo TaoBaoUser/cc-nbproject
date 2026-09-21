@@ -331,7 +331,8 @@ async function main() {
         含v4flash: options.some((o) => o.dataset.value === 'deepseek/deepseek-v4-flash'),
         建议: [...card.querySelectorAll('.model-suggest')].map((b) => b.textContent),
         // 旧版用的是原生 <datalist>，浮层由浏览器画，候选一多就只能靠键盘硬顶，
-        // 撑不出滚动条。换成自写列表后这条必须成立（front-plans 记录的原始痛点）。
+        // 撑不出滚动条。换成自写列表后这条必须成立
+        // （docs/plans/2026-09-21-检查模型选择连接.md 记录的原始痛点）。
         列表可滚动: list ? list.scrollHeight > list.clientHeight : null,
       };
     `);

@@ -34,7 +34,8 @@ function shouldDropUp(el: HTMLElement): boolean {
 /**
  * 自写的可搜索、可滚动下拉，替代原生 <datalist>。
  *
- * 原生 datalist 是浏览器黑盒：无法滚动、样式不可控（见 front-plans 里的「下拉固定、不能滚动」）。
+ * 原生 datalist 是浏览器黑盒：无法滚动、样式不可控
+ * （见 docs/plans/2026-09-21-检查模型选择连接.md 里的「下拉固定、不能滚动」）。
  * 这里用普通 <input> + 一个可滚动候选列表实现，同时保留自由输入能力 ——
  * 没有 /v1/models 的供应商（DeepSeek）候选为空时，输入框退化为普通文本框。
  */
