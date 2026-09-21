@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      CSP：限制页面只能加载自身资源。
+      渲染进程会展示来自上游 API 的内容，收紧资源加载面能显著降低
+      万一有内容被当作代码执行时的破坏范围。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none';"
+    />
+    <title>cc-nbproject</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-name">cc-nbproject</div>
+          <div class="brand-sub">Claude Code 供应商路由</div>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-item is-active" data-view="providers">供应商</button>
+          <button class="nav-item" data-view="logs">日志</button>
+          <button class="nav-item" data-view="usage">用量</button>
+        </nav>
+
+        <div class="proxy-card">
+          <div class="proxy-line">
+            <span class="status-dot" id="proxy-dot"></span>
+            <span id="proxy-label">代理未运行</span>
+          </div>
+          <code class="proxy-url" id="proxy-url">—</code>
+          <p class="hint">Claude Code 的 ANTHROPIC_BASE_URL 应指向此地址</p>
+          <button class="btn btn-ghost btn-sm" id="btn-setup">配置 Claude Code</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <!-- 供应商 -->
+        <section class="view is-active" id="view-providers">
+          <header class="view-header">
+            <div>
+              <h1>供应商</h1>
+              <p class="view-sub">点击卡片即可切换，正在运行的 Claude Code 会话无需重启</p>
+            </div>
+            <button class="btn btn-primary" id="btn-add">添加供应商</button>
+          </header>
+          <div class="list" id="provider-list"></div>
+          <div class="empty" id="provider-empty" hidden>
+            <p>还没有任何供应商。</p>
+            <p class="hint">添加一个后，把 Claude Code 指向左侧的代理地址即可。</p>
+          </div>
+        </section>
+
+        <!-- 日志 -->
+        <section class="view" id="view-logs">
+          <header class="view-header">
+            <div>
+              <h1>日志</h1>
+              <p class="view-sub">实时请求记录</p>
+            </div>
+            <div class="actions">
+              <label class="toggle">
+                <input type="checkbox" id="log-autoscroll" checked />
+                <span>自动滚动</span>
+              </label>
+              <button class="btn btn-ghost btn-sm" id="btn-clear-logs">清空</button>
+            </div>
+          </header>
+          <div class="log-list" id="log-list"></div>
+        </section>
+
+        <!-- 用量 -->
+        <section class="view" id="view-usage">
+          <header class="view-header">
+            <div>
+              <h1>用量</h1>
+              <p class="view-sub">按供应商统计的 token 消耗</p>
+            </div>
+            <div class="actions">
+              <select class="select" id="usage-range">
+                <option value="86400000">最近 24 小时</option>
+                <option value="604800000">最近 7 天</option>
+                <option value="2592000000">最近 30 天</option>
+                <option value="">全部</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" id="btn-refresh-usage">刷新</button>
+            </div>
+          </header>
+
+          <div class="stat-row" id="usage-total"></div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>供应商</th>
+                <th class="num">请求数</th>
+                <th class="num">输入 token</th>
+                <th class="num">输出 token</th>
+                <th class="num">错误</th>
+              </tr>
+            </thead>
+            <tbody id="usage-table"></tbody>
+          </table>
+          <div class="empty" id="usage-empty" hidden>
+            <p>还没有用量记录。</p>
+            <p class="hint">通过代理发起的请求会自动记录在这里。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- 模态框容器。内容由 app.js 动态构建。 -->
+    <div class="modal-root" id="modal-root" hidden></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
