@@ -35,7 +35,7 @@ const DEFAULT_STATE = {
 const FILE_MODE = 0o600;
 const DIR_MODE = 0o700;
 
-function createStore({ dir = DEFAULT_DIR, logger = console } = {}) {
+function createStore({ dir = DEFAULT_DIR } = {}) {
   const profilesFile = path.join(dir, 'profiles.json');
 
   function ensureDir() {

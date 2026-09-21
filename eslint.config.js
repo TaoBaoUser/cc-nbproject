@@ -24,6 +24,7 @@ const nodeGlobals = {
   clearInterval: 'readonly',
   setImmediate: 'readonly',
   URL: 'readonly',
+  structuredClone: 'readonly',
   TextDecoder: 'readonly',
   TextEncoder: 'readonly',
   fetch: 'readonly',
