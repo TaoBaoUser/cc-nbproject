@@ -525,6 +525,26 @@ function parseNonStreamingUsage(buffer) {
 }
 
 /**
+ * 从上游的错误响应里抽出可读信息。
+ *
+ * 各家供应商的错误体形状不一（`{error:{message}}` / `{message}` / 纯文本），
+ * 直接原样丢给用户是一大坨 JSON，关键字被挤在中间；而那句话往往正是
+ * 唯一的线索（例如「你发的模型名是 xxx，我不认识」）。
+ * 解析不出来就退回原文，绝不因为解析失败而丢掉信息。
+ */
+function summarizeUpstreamError(text) {
+  try {
+    const json = JSON.parse(text);
+    const message = json && json.error && json.error.message;
+    if (typeof message === 'string' && message) return message;
+    if (json && typeof json.message === 'string' && json.message) return json.message;
+  } catch {
+    // 不是 JSON —— 用原文
+  }
+  return text;
+}
+
+/**
  * 连接测试：向指定供应商发一个最小的真实请求，验证端点可达、凭证有效。
  *
  * 为什么不用 GET /v1/models 之类的轻量接口：Anthropic 兼容实现的覆盖面参差不齐，
@@ -606,13 +626,15 @@ async function testUpstream(
           }
 
           // 400/404 常见于模型名不对，但说明端点和凭证已经通过了校验
-          const looksLikeModelIssue = /model/i.test(text);
+          const summary = summarizeUpstreamError(text);
+          const looksLikeModelIssue = /model|模型/i.test(text);
           resolve({
             ok: false,
             kind: looksLikeModelIssue ? 'model_not_found' : 'upstream_error',
             status: res.statusCode,
             durationMs,
-            message: text.slice(0, 300),
+            // 保留上游原话而不是自造一句，否则用户拿不到可搜索的关键词
+            message: summary.slice(0, 500),
           });
         });
       }
@@ -642,4 +664,5 @@ module.exports = {
   filterHeaders,
   normalizeModelMap,
   rewriteModel,
+  summarizeUpstreamError,
 };

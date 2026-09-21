@@ -345,6 +345,16 @@ h1 {
   color: var(--danger);
 }
 
+/* 上游的原始报错。字体更小、颜色更淡，避免盖过结论本身 */
+.test-detail {
+  margin-top: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  word-break: break-all;
+  opacity: 0.85;
+}
+
 /* ---------- 日志 ---------- */
 
 .log-list {
@@ -586,6 +596,23 @@ h1 {
   font-size: 11.5px;
   color: var(--text-dim);
   margin-top: 4px;
+}
+
+/*
+ * 映射解析结果的实时回显。
+ * 用等宽字体：这里显示的是解析出来的键值对，对齐后更容易和输入框逐条对照。
+ */
+.field-status {
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--success);
+  word-break: break-all;
+}
+
+.field-status.is-warn {
+  color: var(--warning);
 }
 
 .modal-actions {

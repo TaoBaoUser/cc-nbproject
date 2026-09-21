@@ -116,6 +116,8 @@
     <!-- 模态框容器。内容由 app.js 动态构建。 -->
     <div class="modal-root" id="modal-root" hidden></div>
 
+    <!-- 必须排在 app.js 之前：它定义的函数是 app.js 的依赖 -->
+    <script src="model-map.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

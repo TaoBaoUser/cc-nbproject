@@ -71,7 +71,25 @@ module.exports = [
     files: ['src/renderer/**/*.js'],
     languageOptions: {
       sourceType: 'script',
-      globals: browserGlobals,
+      globals: {
+        ...browserGlobals,
+        // 由 model-map.js 定义、app.js 使用。index.html 保证前者先加载，
+        // 但 ESLint 只看单个文件，所以必须在这里声明，否则 app.js 会误报 no-undef。
+        parseModelMap: 'readonly',
+        findModelMapProblems: 'readonly',
+      },
+    },
+  },
+  {
+    /*
+     * 唯一的例外：model-map.js 同时被渲染进程（<script> 标签）和
+     * node --test（require）加载。它用 `typeof module !== 'undefined'` 守卫
+     * 那行导出语句，浏览器里永远不会执行到，所以这里放行 module 是安全的。
+     * 加这条例外是为了换来"这段解析逻辑有单元测试"——它曾经静默写坏过配置。
+     */
+    files: ['src/renderer/model-map.js'],
+    languageOptions: {
+      globals: { ...browserGlobals, module: 'readonly' },
     },
   },
 ];

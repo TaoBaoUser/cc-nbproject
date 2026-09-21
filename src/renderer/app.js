@@ -85,7 +85,18 @@ function describeTestResult(result) {
     invalid_url: 'baseUrl 不是合法 URL',
     upstream_error: `上游返回 ${result.status}`,
   };
-  return { ok: false, text: `✗ ${reasons[result.kind] || result.message || '未知错误'}` };
+
+  // 把上游的原始报错一并带出来。它通常直接点明原因（收到了什么模型名、
+  // 缺哪个参数），撇开它只剩一句「模型名不被接受」，用户根本无从下手。
+  const verboseKinds = ['model_not_found', 'upstream_error'];
+  const detail = verboseKinds.includes(result.kind) ? result.message || '' : '';
+
+  return {
+    ok: false,
+    text: `✗ ${reasons[result.kind] || result.message || '未知错误'}`,
+    detail: detail.slice(0, 300),
+    detailTitle: detail,
+  };
 }
 
 function renderProviderCard(profile) {
@@ -113,6 +124,16 @@ function renderProviderCard(profile) {
   if (result) {
     const resultClass = result.ok === true ? 'ok' : result.ok === false ? 'fail' : '';
     body.appendChild(el('div', { className: `test-result ${resultClass}`, text: result.text }));
+    if (result.detail) {
+      // title 属性让鼠标悬停能看到未截断的完整报错
+      body.appendChild(
+        el('div', {
+          className: 'test-detail',
+          text: `上游原话：${result.detail}`,
+          attrs: { title: result.detailTitle },
+        })
+      );
+    }
   }
 
   const actions = el('div', { className: 'card-actions' });
@@ -192,26 +213,8 @@ function closeModal() {
   root.replaceChildren();
 }
 
-/**
- * 解析模型映射输入框。
- *
- * 格式：每行一条「源模型名=目标模型名」，以 # 开头的行视为注释。
- * 之所以用这种朴素格式而不是做一套表格 UI：映射本身是个低频、小规模的配置
- * （通常两三条），文本行的编辑成本远低于为了让表格好看而付出的代码量。
- */
-function parseModelMap(text) {
-  const map = {};
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const separator = trimmed.indexOf('=');
-    if (separator === -1) continue;
-    const from = trimmed.slice(0, separator).trim();
-    const to = trimmed.slice(separator + 1).trim();
-    if (from && to) map[from] = to;
-  }
-  return map;
-}
+// parseModelMap / findModelMapProblems 来自 model-map.js（由 index.html 先行加载）。
+// 拆出去是为了让这段解析逻辑有单元测试 —— 它曾静默写坏过用户的配置。
 
 function formatModelMap(modelMap) {
   if (!modelMap) return '';
@@ -251,11 +254,37 @@ function openProfileModal(profile = null) {
     attrs: {
       rows: '4',
       spellcheck: 'false',
+      // 占位示例必须是**真实可用**的一对。用户会直接照着改，示例里的目标名
+      // 但凡写错，就变成了把人往坑里带 —— 这里曾把 flash 误写成 deepseek-chat
+      // （那是 V3），照抄会把后台小任务模型指到错误的代次上。
       placeholder:
-        'deepseek-v4-pro=deepseek/deepseek-v4-pro\ndeepseek-flash=deepseek/deepseek-chat',
+        'deepseek-v4-pro=deepseek/deepseek-v4-pro\ndeepseek-flash=deepseek/deepseek-v4-flash',
     },
   });
   modelMapInput.value = formatModelMap(profile && profile.modelMap);
+
+  // 实时显示"解析成了几条规则"。
+  // 这是映射功能唯一有效的自检手段：只填错一点点（比如换行没生效）也会让
+  // 三条规则变成一条，而输入框本身看不出区别 —— 必须把解析结果摆出来。
+  const mapStatus = el('div', { className: 'field-status' });
+  const refreshMapStatus = () => {
+    const parsed = parseModelMap(modelMapInput.value);
+    const problems = findModelMapProblems(parsed);
+
+    if (problems.length > 0) {
+      mapStatus.className = 'field-status is-warn';
+      mapStatus.textContent = `⚠ ${problems.join('；')}`;
+      return;
+    }
+    mapStatus.className = 'field-status';
+    const entries = Object.entries(parsed);
+    mapStatus.textContent =
+      entries.length > 0
+        ? `已解析 ${entries.length} 条：${entries.map(([f, t]) => `${f} → ${t}`).join('，')}`
+        : '';
+  };
+  modelMapInput.addEventListener('input', refreshMapStatus);
+  refreshMapStatus();
 
   const field = (labelText, input, hint) => {
     const wrap = el('div', { className: 'field' });
@@ -272,14 +301,14 @@ function openProfileModal(profile = null) {
   modal.appendChild(
     field('API Key', keyInput, '仅保存在本机 ~/.cc-nbproject/，文件权限 600，不会进入任何版本库')
   );
-  modal.appendChild(
-    field(
-      '模型映射（可选）',
-      modelMapInput,
-      'Claude Code 发出的模型名在不同供应商那里叫法不同。每行一条「源=目标」，' +
-        '未命中的模型名将原样转发。留空则不启用映射。'
-    )
+  const mapField = field(
+    '模型映射（可选）',
+    modelMapInput,
+    'Claude Code 发出的模型名在不同供应商那里叫法不同。每行一条「源=目标」，' +
+      '未命中的模型名将原样转发。留空则不启用映射。'
   );
+  mapField.appendChild(mapStatus);
+  modal.appendChild(mapField);
 
   const errorText = el('div', { className: 'error-text' });
   modal.appendChild(errorText);

@@ -21,6 +21,7 @@ const {
   createUsageExtractor,
   normalizeModelMap,
   rewriteModel,
+  summarizeUpstreamError,
 } = require('../src/main/proxy.js');
 
 /** 起一个测试用的假上游服务器，端口交给操作系统随机分配。 */
@@ -540,6 +541,20 @@ test('模型映射：非 JSON 请求体不被解析也不被破坏', async (t) =
   await requestThroughProxy(`http://127.0.0.1:${proxyPort}`, { body: '这是纯文本，不是 JSON' });
 
   assert.equal(seen, '这是纯文本，不是 JSON');
+});
+
+test('summarizeUpstreamError：从各家不同形状的错误体里抽出可读信息', () => {
+  // Anthropic / OpenRouter 风格
+  assert.equal(
+    summarizeUpstreamError('{"error":{"message":"model not found"}}'),
+    'model not found'
+  );
+  // 部分兼容实现直接给 message
+  assert.equal(summarizeUpstreamError('{"message":"invalid model"}'), 'invalid model');
+  // 不是 JSON —— 必须退回原文，绝不能因为解析失败就把信息丢掉
+  assert.equal(summarizeUpstreamError('gateway timeout'), 'gateway timeout');
+  // 是 JSON 但没有可用的消息字段 —— 同样退回原文
+  assert.equal(summarizeUpstreamError('{"code":500}'), '{"code":500}');
 });
 
 test('模型映射：连接测试用映射后的目标模型名探测', async (t) => {
