@@ -7,7 +7,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/",
+    "test": "node --test",
     "lint": "eslint .",
     "format": "prettier --write .",
     "postinstall": "node node_modules/electron/install.js"
