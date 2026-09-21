@@ -98,6 +98,17 @@ function renderProviderCard(profile) {
   body.appendChild(el('div', { className: 'card-title' }, titleChildren));
   body.appendChild(el('div', { className: 'card-url', text: profile.baseUrl }));
 
+  // 映射规则是隐式生效的，不显示出来用户很容易忘了自己配过
+  const mapCount = profile.modelMap ? Object.keys(profile.modelMap).length : 0;
+  if (mapCount > 0) {
+    const rules = Object.entries(profile.modelMap)
+      .map(([from, to]) => `${from} → ${to}`)
+      .join('，');
+    body.appendChild(
+      el('div', { className: 'card-note', text: `模型映射 ${mapCount} 条：${rules}` })
+    );
+  }
+
   const result = describeTestResult(state.testResults.get(profile.id));
   if (result) {
     const resultClass = result.ok === true ? 'ok' : result.ok === false ? 'fail' : '';
@@ -181,6 +192,34 @@ function closeModal() {
   root.replaceChildren();
 }
 
+/**
+ * 解析模型映射输入框。
+ *
+ * 格式：每行一条「源模型名=目标模型名」，以 # 开头的行视为注释。
+ * 之所以用这种朴素格式而不是做一套表格 UI：映射本身是个低频、小规模的配置
+ * （通常两三条），文本行的编辑成本远低于为了让表格好看而付出的代码量。
+ */
+function parseModelMap(text) {
+  const map = {};
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const separator = trimmed.indexOf('=');
+    if (separator === -1) continue;
+    const from = trimmed.slice(0, separator).trim();
+    const to = trimmed.slice(separator + 1).trim();
+    if (from && to) map[from] = to;
+  }
+  return map;
+}
+
+function formatModelMap(modelMap) {
+  if (!modelMap) return '';
+  return Object.entries(modelMap)
+    .map(([from, to]) => `${from}=${to}`)
+    .join('\n');
+}
+
 function openProfileModal(profile = null) {
   const isEdit = Boolean(profile);
   const root = $('#modal-root');
@@ -207,6 +246,17 @@ function openProfileModal(profile = null) {
   const keyInput = el('input', { attrs: { type: 'password', placeholder: 'sk-...' } });
   keyInput.value = profile ? profile.apiKey : '';
 
+  const modelMapInput = el('textarea', {
+    className: 'textarea',
+    attrs: {
+      rows: '4',
+      spellcheck: 'false',
+      placeholder:
+        'deepseek-v4-pro=deepseek/deepseek-v4-pro\ndeepseek-flash=deepseek/deepseek-chat',
+    },
+  });
+  modelMapInput.value = formatModelMap(profile && profile.modelMap);
+
   const field = (labelText, input, hint) => {
     const wrap = el('div', { className: 'field' });
     wrap.appendChild(el('label', { text: labelText }));
@@ -222,6 +272,14 @@ function openProfileModal(profile = null) {
   modal.appendChild(
     field('API Key', keyInput, '仅保存在本机 ~/.cc-nbproject/，文件权限 600，不会进入任何版本库')
   );
+  modal.appendChild(
+    field(
+      '模型映射（可选）',
+      modelMapInput,
+      'Claude Code 发出的模型名在不同供应商那里叫法不同。每行一条「源=目标」，' +
+        '未命中的模型名将原样转发。留空则不启用映射。'
+    )
+  );
 
   const errorText = el('div', { className: 'error-text' });
   modal.appendChild(errorText);
@@ -234,6 +292,7 @@ function openProfileModal(profile = null) {
     const name = nameInput.value.trim();
     const baseUrl = urlInput.value.trim();
     const apiKey = keyInput.value.trim();
+    const modelMap = parseModelMap(modelMapInput.value);
 
     if (!name || !baseUrl) {
       errorText.textContent = '名称和 Base URL 为必填项';
@@ -243,9 +302,9 @@ function openProfileModal(profile = null) {
     saveBtn.disabled = true;
     try {
       if (isEdit) {
-        await window.ccnb.updateProfile(profile.id, { name, baseUrl, apiKey });
+        await window.ccnb.updateProfile(profile.id, { name, baseUrl, apiKey, modelMap });
       } else {
-        await window.ccnb.addProfile({ name, baseUrl, apiKey });
+        await window.ccnb.addProfile({ name, baseUrl, apiKey, modelMap });
       }
       closeModal();
       await refreshProfiles();
@@ -294,6 +353,10 @@ function renderLogRow(entry) {
     if (entry.phase === 'start') {
       message = `→ ${entry.method} ${entry.path}`;
       meta = entry.profileName;
+    } else if (entry.phase === 'rewrite') {
+      message = `模型映射：${entry.from} → ${entry.to}`;
+      meta = entry.profileName;
+      className += ' is-switch';
     } else if (entry.phase === 'error') {
       message = `上游错误：${entry.error}`;
       meta = entry.profileName;
@@ -431,7 +494,11 @@ async function runClaudeSetup() {
   const table = el('table', { className: 'diff-table' });
   table.appendChild(
     el('thead', {}, [
-      el('tr', {}, [el('th', { text: '配置项' }), el('th', { text: '当前值' }), el('th', { text: '将改为' })]),
+      el('tr', {}, [
+        el('th', { text: '配置项' }),
+        el('th', { text: '当前值' }),
+        el('th', { text: '将改为' }),
+      ]),
     ])
   );
   const tbody = el('tbody');
@@ -470,7 +537,9 @@ async function runClaudeSetup() {
         el('p', { className: 'modal-sub', text: '请重启 Claude Code 以加载新的配置。' }),
         el('div', {
           className: 'notice notice-info',
-          text: result.backupPath ? `原配置已备份至：\n${result.backupPath}` : '原文件不存在，未产生备份。',
+          text: result.backupPath
+            ? `原配置已备份至：\n${result.backupPath}`
+            : '原文件不存在，未产生备份。',
         }),
         el('div', { className: 'modal-actions' }, [
           (() => {

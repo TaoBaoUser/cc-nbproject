@@ -26,13 +26,13 @@ Claude Code 通过 `~/.claude/settings.json` 的 `env` 块读取供应商配置�
 
 我们对 Claude Code 的配置机制做了核实，结论如下：
 
-| 机制 | 事实 | 影响 |
-|---|---|---|
-| `env` 值插值 | **不支持**（[issue #46889](https://github.com/anthropics/claude-code/issues/46889) 至今未实现） | 无法写 `"${MY_KEY}"`，工具必须自己完成取值 |
-| base URL 的运行时钩子 | **不存在** | 只有 `apiKeyHelper` 能动态供 API key，**没有**对应的 base URL helper |
-| `env` 删除语义 | 运行中的会话**不会** unset 被删掉的变量 | 切换时只能覆盖，不能靠删 |
-| 配置优先级 | user → project → local → `--settings` → managed | 企业 managed settings 会压过一切用户级配置 |
-| `~/.claude.json` | **不是** settings 源 | 写在这里的 `env` 会被完全忽略 |
+| 机制                  | 事实                                                                                            | 影响                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `env` 值插值          | **不支持**（[issue #46889](https://github.com/anthropics/claude-code/issues/46889) 至今未实现） | 无法写 `"${MY_KEY}"`，工具必须自己完成取值                           |
+| base URL 的运行时钩子 | **不存在**                                                                                      | 只有 `apiKeyHelper` 能动态供 API key，**没有**对应的 base URL helper |
+| `env` 删除语义        | 运行中的会话**不会** unset 被删掉的变量                                                         | 切换时只能覆盖，不能靠删                                             |
+| 配置优先级            | user → project → local → `--settings` → managed                                                 | 企业 managed settings 会压过一切用户级配置                           |
+| `~/.claude.json`      | **不是** settings 源                                                                            | 写在这里的 `env` 会被完全忽略                                        |
 
 **关键推论**：由于 base URL 没有任何运行时钩子，**只要 base URL 会变，就一定要重启**。这是纯配置写入方案的硬性天花板。
 
@@ -55,16 +55,22 @@ Claude Code 通过 `~/.claude/settings.json` 的 `env` 块读取供应商配置�
 3. **首次启动引导**：把 Claude Code 指向本地代理（一次性、需用户确认）
 4. **请求日志**：实时看到每个请求走了哪个供应商、状态码、耗时
 5. **用量统计**：累计 token 消耗与请求数
+6. **模型映射**：把 Claude Code 发出的模型名按规则改写成各供应商自己的叫法（见 6.5）
 
 ### 非目标（v0.1 明确不做）
 
-| 不做的事 | 原因 |
-|---|---|
-| 模型映射 | 锦上添花；v0.1 先用 Claude Code 原生的 `ANTHROPIC_DEFAULT_*_MODEL` 解决 |
-| 故障转移 | 需要先有稳定的代理核心和可靠的错误分类，放在 v0.2 更稳 |
-| 系统托盘 / 菜单栏 | 纯体验优化，且各平台差异大 |
-| 支持 Codex / Gemini CLI | 先把 Claude Code 一个客户端做扎实 |
-| 应用打包分发 | v0.1 用 `npm start` 开发模式运行，打包放 v0.2 |
+| 不做的事                | 原因                                                   |
+| ----------------------- | ------------------------------------------------------ |
+| 故障转移                | 需要先有稳定的代理核心和可靠的错误分类，放在 v0.2 更稳 |
+| 系统托盘 / 菜单栏       | 纯体验优化，且各平台差异大                             |
+| 支持 Codex / Gemini CLI | 先把 Claude Code 一个客户端做扎实                      |
+| 应用打包分发            | v0.1 用 `npm start` 开发模式运行，打包放 v0.2          |
+
+> **模型映射的立场变更**：本节最初把模型映射列为"非目标"，理由是 v0.1 可以先用
+> Claude Code 原生的 `ANTHROPIC_DEFAULT_*_MODEL` 应付。实测后推翻了这个判断 ——
+> 那些变量是在 Claude Code 侧配置的，**每换一个供应商仍要改一次配置并重启**，
+> 与"零重启切换"这个核心目标直接冲突。模型映射因此是必需项而非锦上添花，
+> 已提前到 v0.1 实现（见 6.5）。
 
 ---
 
@@ -127,8 +133,8 @@ Claude Code 通过 `~/.claude/settings.json` 的 `env` 块读取供应商配置�
 ```js
 // 概念示意：依赖注入，而非直接依赖 Electron
 const proxy = createProxy({
-  getActiveProfile: () => store.getActive(),   // 注入
-  onUsage: (record) => usage.append(record),   // 注入
+  getActiveProfile: () => store.getActive(), // 注入
+  onUsage: (record) => usage.append(record), // 注入
 });
 ```
 
@@ -138,15 +144,15 @@ const proxy = createProxy({
 
 ## 4. 技术选型
 
-| 选择 | 版本 | 理由 |
-|---|---|---|
-| **Runtime** | Node.js ≥ 20 | Electron 44 内置的 Node 版本远高于此；`engines` 字段只用于约束开发环境 |
-| **桌面框架** | Electron 44 | 用户指定 Node 技术栈。相比 Tauri 无需引入 Rust 工具链，学习成本集中在 JS 一侧 |
-| **模块系统** | CommonJS | Electron 主进程对 ESM 的支持较新且在 preload 等场景有额外约束。CommonJS 在本生态中资料最多、坑最少，适合以学习为目的的项目 |
-| **HTTP 代理** | Node 内置 `http` / `https` | 不引入 express/koa。代理的核心是 `pipe` 流式转发，用内置模块反而更直接、更少黑盒 |
-| **测试** | Node 内置 `node --test` | Node 20+ 自带测试运行器，无需 jest/vitest。零额外依赖，且足够覆盖 `proxy.js` 这类纯逻辑模块 |
-| **Lint / 格式化** | ESLint 10 + Prettier 3 | 工程化基线，保证代码风格一致 |
-| **配置存储** | JSON 文件 | 数据量极小（几个 profile、按天的用量），无需数据库。存放在 `~/.cc-nbproject/` |
+| 选择              | 版本                       | 理由                                                                                                                       |
+| ----------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Runtime**       | Node.js ≥ 20               | Electron 44 内置的 Node 版本远高于此；`engines` 字段只用于约束开发环境                                                     |
+| **桌面框架**      | Electron 44                | 用户指定 Node 技术栈。相比 Tauri 无需引入 Rust 工具链，学习成本集中在 JS 一侧                                              |
+| **模块系统**      | CommonJS                   | Electron 主进程对 ESM 的支持较新且在 preload 等场景有额外约束。CommonJS 在本生态中资料最多、坑最少，适合以学习为目的的项目 |
+| **HTTP 代理**     | Node 内置 `http` / `https` | 不引入 express/koa。代理的核心是 `pipe` 流式转发，用内置模块反而更直接、更少黑盒                                           |
+| **测试**          | Node 内置 `node --test`    | Node 20+ 自带测试运行器，无需 jest/vitest。零额外依赖，且足够覆盖 `proxy.js` 这类纯逻辑模块                                |
+| **Lint / 格式化** | ESLint 10 + Prettier 3     | 工程化基线，保证代码风格一致                                                                                               |
+| **配置存储**      | JSON 文件                  | 数据量极小（几个 profile、按天的用量），无需数据库。存放在 `~/.cc-nbproject/`                                              |
 
 ---
 
@@ -203,6 +209,7 @@ upstreamRes.pipe(clientRes);
 **旁路解析**：`pipe` 是单向的，无法同时解析数据。因此不能直接 `pipe`，而要监听 `data` 事件：一边 `write` 给客户端，一边喂给增量解析器提取用量（见 6.2）。这是为什么用 `http` 内置模块更合适 —— 事件流是透明的。
 
 **错误分类**（为 v0.2 的故障转移预留）：
+
 - **未响应头阶段出错** → 可安全重试下一个 profile（此时还没给客户端写任何字节）
 - **已开始流式响应后出错** → 不可重试，只能中断并向客户端报错
 
@@ -212,10 +219,10 @@ upstreamRes.pipe(clientRes);
 
 **决策**：不自己估算 token，直接读上游响应里的官方数据。
 
-| 响应类型 | 数据位置 |
-|---|---|
+| 响应类型    | 数据位置                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------- |
 | 流式（SSE） | 末尾的 `message_start` 带 `usage.input_tokens`，`message_delta` 带累计 `usage.output_tokens` |
-| 非流式 | 响应体顶层的 `usage` 字段 |
+| 非流式      | 响应体顶层的 `usage` 字段                                                                    |
 
 代理只需在旁路解析时提取这两个字段，**转发内容本身零改动**。
 
@@ -233,6 +240,32 @@ Claude Code 会把 `ANTHROPIC_AUTH_TOKEN` 的值放在 `Authorization: Bearer <t
 
 写入完成后设置文件权限为 `600`（仅当前用户可读写），防止同机其他账户读取 API key。
 
+### 6.5 模型映射
+
+**问题**：Claude Code 发出的 `model` 字段是它自己配置里的模型名（例如 `deepseek-v4-pro`），而不同供应商对同一个模型的叫法不同 —— OpenRouter 要求 `vendor/model` 形式（`deepseek/deepseek-v4-pro`）。少了这层映射，切换供应商后请求会被上游直接拒绝，且报错信息通常不指向真正原因。
+
+**决策：用映射表，而不是"单一模型覆盖"。**
+
+这是一个容易被做错的点。直觉上"换个供应商就换个模型"，会倾向于给 profile 加一个 `model` 字段做整体替换。但 **Claude Code 一次会话里会发出多个不同的模型名**：主模型，以及后台小任务用的快速模型（`ANTHROPIC_SMALL_FAST_MODEL`）。一对一替换会把它们压成同一个，后台任务因此用上昂贵的主模型，账单会悄悄上涨。
+
+映射表（`{"源模型名": "目标模型名"}`）才能让每个模型各归其位。未命中的模型名**原样转发**，而不是报错或丢弃 —— 这样用户只配需要改的那几条即可。
+
+**性能取舍：只有配了映射的供应商才缓冲请求体。**
+
+改写 `model` 必须先把请求体完整读进内存（要解析 JSON）。为了不让这个功能拖累所有供应商，代码分成两条路径：
+
+| 条件       | 路径                       | 代价                           |
+| ---------- | -------------------------- | ------------------------------ |
+| 未配置映射 | `clientReq.pipe(upstream)` | 零 —— 字节流直接对穿，不过内存 |
+| 配置了映射 | 缓冲 → 解析 → 改写 → 发送  | 请求体在内存里过一遍           |
+
+判定在 `normalizeModelMap()`：返回 `null` 表示"没配"，走快路径。注意这**只影响请求体**，响应方向无论如何都不缓冲（见 6.1）。
+
+**两个配套细节**：
+
+- **`content-length` 必须按改写后的字节数重算。** 目标名通常比源名长，沿用原始长度会让上游截断请求体或挂起等待不存在的剩余字节。
+- **连接测试要用映射后的目标名去探测。** 用源名测，供应商必然回 `model_not_found`，会把配置正确的供应商误报为有问题 —— 比不测更糟。
+
 ---
 
 ## 7. 数据模型
@@ -246,15 +279,18 @@ Claude Code 会把 `ANTHROPIC_AUTH_TOKEN` 的值放在 `Authorization: Bearer <t
   "profiles": [
     {
       "id": "uuid",
-      "name": "DeepSeek",                        // 展示名
+      "name": "DeepSeek", // 展示名
       "baseUrl": "https://api.deepseek.com/anthropic",
-      "apiKey": "sk-...",                        // 明文，靠文件权限 600 保护
-      "createdAt": "2026-09-21T10:00:00.000Z"
-    }
+      "apiKey": "sk-...", // 明文，靠文件权限 600 保护
+      "createdAt": "2026-09-21T10:00:00.000Z",
+      // 可选。源模型名 -> 目标模型名，未命中的原样转发。见 6.5。
+      // 空对象 {} 与缺省等价，均表示不启用映射。
+      "modelMap": { "deepseek-v4-pro": "deepseek/deepseek-v4-pro" },
+    },
   ],
   "settings": {
-    "port": 8787                                 // 实际端口在运行时探测，可能与此不同
-  }
+    "port": 8787, // 实际端口在运行时探测，可能与此不同
+  },
 }
 ```
 
@@ -265,7 +301,15 @@ Claude Code 会把 `ANTHROPIC_AUTH_TOKEN` 的值放在 `Authorization: Bearer <t
 按行追加的 JSONL，每行一条请求记录，便于流式追加和按天聚合：
 
 ```jsonc
-{"ts":"2026-09-21T10:00:00.000Z","profileId":"uuid","model":"deepseek-v4-pro","inputTokens":1024,"outputTokens":512,"status":200,"durationMs":3200}
+{
+  "ts": "2026-09-21T10:00:00.000Z",
+  "profileId": "uuid",
+  "model": "deepseek-v4-pro",
+  "inputTokens": 1024,
+  "outputTokens": 512,
+  "status": 200,
+  "durationMs": 3200,
+}
 ```
 
 选择 JSONL 而非单个 JSON 数组的原因：追加写是 O(1)，不需要读出整个文件再写回，避免了用量增长后每次记录都要重写全文件。
@@ -274,13 +318,13 @@ Claude Code 会把 `ANTHROPIC_AUTH_TOKEN` 的值放在 `Authorization: Bearer <t
 
 ## 8. 安全与风险
 
-| 风险 | 处理 |
-|---|---|
-| **API key 落地** | 存 `~/.cc-nbproject/`，权限 `600`；`.gitignore` 兜底；提交前人工复扫确认无 key 混入 |
+| 风险                             | 处理                                                                                                                                         |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **API key 落地**                 | 存 `~/.cc-nbproject/`，权限 `600`；`.gitignore` 兜底；提交前人工复扫确认无 key 混入                                                          |
 | **改写用户 Claude Code 配置** ⚠️ | `setup.js` 会**覆盖** `~/.claude/settings.json` 的 `env` 块。**不自动执行**：先备份为 `settings.json.bak.<时间戳>`，再把 diff 展示给用户确认 |
-| **代理被外部访问** | 只 `listen` 在 `127.0.0.1`，不监听 `0.0.0.0` |
-| **渲染进程越权** | `contextIsolation: true` + `nodeIntegration: false`；渲染进程只能通过 preload 暴露的白名单方法访问主进程能力 |
-| **企业 managed settings 冲突** | 若用户环境存在 managed settings 下发的 `ANTHROPIC_BASE_URL`，会压过用户级配置，导致本工具失效。启动时检测并在 UI 中提示 |
+| **代理被外部访问**               | 只 `listen` 在 `127.0.0.1`，不监听 `0.0.0.0`                                                                                                 |
+| **渲染进程越权**                 | `contextIsolation: true` + `nodeIntegration: false`；渲染进程只能通过 preload 暴露的白名单方法访问主进程能力                                 |
+| **企业 managed settings 冲突**   | 若用户环境存在 managed settings 下发的 `ANTHROPIC_BASE_URL`，会压过用户级配置，导致本工具失效。启动时检测并在 UI 中提示                      |
 
 ---
 
@@ -294,6 +338,7 @@ Claude Code 会把 `ANTHROPIC_AUTH_TOKEN` 的值放在 `Authorization: Bearer <t
 - 用量提取：喂入构造好的 SSE 事件序列，断言提取出的 token 数正确
 - 鉴权重写：断言发往上游的请求头里是 profile 的 key，而非客户端传来的
 - 错误分类：断言"未响应头"与"已响应头"两种情况被正确区分
+- 模型映射：断言改写后发给上游的 `model` 是目标名、`content-length` 已按新长度重算、未命中的模型名原样透传、非 JSON 请求体不被破坏
 
 UI 层不做自动化测试 —— 对学习型项目，手工验证的性价比更高。
 
@@ -301,9 +346,10 @@ UI 层不做自动化测试 —— 对学习型项目，手工验证的性价比
 
 ## 10. 版本路线
 
-| 版本 | 内容 |
-|---|---|
-| **v0.1**（本设计） | 代理核心 + 供应商管理 + 连接测试 + 首次引导 + 日志 + 用量统计 |
-| v0.2 | 模型映射、故障转移、系统托盘 |
-| v0.3 | 应用打包（electron-builder）、系统钥匙串存储 key |
-| 待定 | 支持 Codex 等其他 CLI 客户端 |
+| 版本               | 内容                                                                     |
+| ------------------ | ------------------------------------------------------------------------ |
+| **v0.1**（本设计） | 代理核心 + 供应商管理 + 连接测试 + 首次引导 + 日志 + 用量统计            |
+| v0.1 追加          | 模型映射（见 6.5）—— 原计划排在 v0.2，因切换供应商时它是硬需求而提前实现 |
+| v0.2               | 故障转移、系统托盘                                                       |
+| v0.3               | 应用打包（electron-builder）、系统钥匙串存储 key                         |
+| 待定               | 支持 Codex 等其他 CLI 客户端                                             |

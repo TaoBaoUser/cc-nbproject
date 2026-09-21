@@ -15,7 +15,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
 
-const { createProxy, testUpstream, createUsageExtractor } = require('../src/main/proxy.js');
+const {
+  createProxy,
+  testUpstream,
+  createUsageExtractor,
+  normalizeModelMap,
+  rewriteModel,
+} = require('../src/main/proxy.js');
 
 /** 起一个测试用的假上游服务器，端口交给操作系统随机分配。 */
 function startServer(handler) {
@@ -33,7 +39,10 @@ function stopServer(server) {
 }
 
 /** 通过代理发一个请求，记录响应内容以及数据分几次到达。 */
-function requestThroughProxy(baseUrl, { path = '/v1/messages', method = 'POST', body = '{}', headers = {} } = {}) {
+function requestThroughProxy(
+  baseUrl,
+  { path = '/v1/messages', method = 'POST', body = '{}', headers = {} } = {}
+) {
   return new Promise((resolve, reject) => {
     const target = new URL(baseUrl + path);
     const chunks = [];
@@ -69,7 +78,13 @@ function requestThroughProxy(baseUrl, { path = '/v1/messages', method = 'POST', 
 
 /** 构造一个固定的供应商，指向给定的假上游。 */
 function profileFor(baseUrl, overrides = {}) {
-  return { id: 'p1', name: '测试供应商', baseUrl, apiKey: 'sk-real-key-from-profile', ...overrides };
+  return {
+    id: 'p1',
+    name: '测试供应商',
+    baseUrl,
+    apiKey: 'sk-real-key-from-profile',
+    ...overrides,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -364,4 +379,187 @@ test('连接测试：成功时返回延迟', async (t) => {
   assert.equal(result.ok, true);
   assert.equal(result.kind, 'ok');
   assert.ok(result.durationMs >= 0);
+});
+
+// ---------------------------------------------------------------------------
+// 8. 模型映射 —— 换了供应商就得换模型名的那些场景
+// ---------------------------------------------------------------------------
+
+test('normalizeModelMap：无映射时返回 null，让调用方走快路径', () => {
+  assert.equal(normalizeModelMap(undefined), null);
+  assert.equal(normalizeModelMap(null), null);
+  assert.equal(normalizeModelMap({}), null);
+  // 全是无效项，等价于没配
+  assert.equal(normalizeModelMap({ '': 'x', a: '' }), null);
+  // 类型不对时不能抛错 —— 配置文件可能被手工改坏
+  assert.equal(normalizeModelMap([['a', 'b']]), null);
+  assert.equal(normalizeModelMap('a=b'), null);
+});
+
+test('normalizeModelMap：过滤无效项，保留有效项', () => {
+  const map = normalizeModelMap({ a: 'b', '': 'c', d: '', e: 123, f: null });
+  assert.deepEqual(map, { a: 'b' });
+});
+
+test('rewriteModel：命中规则时替换 model 字段，其余字段原样保留', () => {
+  const payload = Buffer.from(
+    JSON.stringify({
+      model: 'deepseek-v4-pro',
+      max_tokens: 8,
+      messages: [{ role: 'user', content: '你好，世界' }],
+    }),
+    'utf8'
+  );
+
+  const result = rewriteModel(payload, { 'deepseek-v4-pro': 'deepseek/deepseek-v4-pro' });
+
+  assert.equal(result.from, 'deepseek-v4-pro');
+  assert.equal(result.to, 'deepseek/deepseek-v4-pro');
+
+  const parsed = JSON.parse(result.body.toString('utf8'));
+  assert.equal(parsed.model, 'deepseek/deepseek-v4-pro');
+  assert.equal(parsed.max_tokens, 8);
+  // 多字节正文必须完整保留
+  assert.equal(parsed.messages[0].content, '你好，世界');
+});
+
+test('rewriteModel：不需要改写时返回 null，避免无谓的重新序列化', () => {
+  const body = (model) => Buffer.from(JSON.stringify({ model }), 'utf8');
+  const map = { a: 'b' };
+
+  // 未命中规则
+  assert.equal(rewriteModel(body('c'), map), null);
+  // 映射到自己
+  assert.equal(rewriteModel(body('a'), { a: 'a' }), null);
+  // 没有 model 字段
+  assert.equal(rewriteModel(Buffer.from('{"x":1}', 'utf8'), map), null);
+  assert.equal(rewriteModel(Buffer.from('{"model":123}', 'utf8'), map), null);
+  // 根本不是 JSON
+  assert.equal(rewriteModel(Buffer.from('not json', 'utf8'), map), null);
+  assert.equal(rewriteModel(Buffer.alloc(0), map), null);
+});
+
+test('模型映射（端到端）：发往上游的是映射后的模型名', async (t) => {
+  let seen = null;
+  const upstream = await startServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      seen = {
+        raw: Buffer.concat(chunks).toString('utf8'),
+        contentLength: req.headers['content-length'],
+      };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"usage":{"input_tokens":1,"output_tokens":1}}');
+    });
+  });
+
+  const events = [];
+  const proxy = createProxy({
+    getActiveProfile: () =>
+      profileFor(upstream.baseUrl, { modelMap: { 'deepseek-v4-pro': 'deepseek/deepseek-v4-pro' } }),
+    onRequest: (e) => events.push(e),
+    port: 0,
+  });
+  const proxyPort = await proxy.start();
+
+  t.after(async () => {
+    await proxy.stop();
+    await stopServer(upstream.server);
+  });
+
+  await requestThroughProxy(`http://127.0.0.1:${proxyPort}`, {
+    body: JSON.stringify({ model: 'deepseek-v4-pro', max_tokens: 8 }),
+  });
+
+  assert.equal(JSON.parse(seen.raw).model, 'deepseek/deepseek-v4-pro');
+  // content-length 必须按改写后的字节数重算：目标名通常比源名长，
+  // 若沿用原始长度，上游会截断请求体或直接挂起等待剩余字节。
+  assert.equal(Number(seen.contentLength), Buffer.byteLength(seen.raw));
+  // UI 日志要能看到映射命中，否则用户无从判断规则有没有生效
+  assert.ok(events.some((e) => e.phase === 'rewrite'));
+});
+
+test('模型映射：未命中的模型名原样转发', async (t) => {
+  let seen = null;
+  const upstream = await startServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      seen = Buffer.concat(chunks).toString('utf8');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"usage":{"input_tokens":1,"output_tokens":1}}');
+    });
+  });
+
+  const proxy = createProxy({
+    getActiveProfile: () =>
+      profileFor(upstream.baseUrl, { modelMap: { 'deepseek-v4-pro': 'deepseek/deepseek-v4-pro' } }),
+    port: 0,
+  });
+  const proxyPort = await proxy.start();
+
+  t.after(async () => {
+    await proxy.stop();
+    await stopServer(upstream.server);
+  });
+
+  // Claude Code 会同时发主模型和后台小任务模型；只配了主模型的映射时，
+  // 小任务模型必须原样透传，而不是被丢弃或改错。
+  await requestThroughProxy(`http://127.0.0.1:${proxyPort}`, {
+    body: JSON.stringify({ model: 'deepseek-flash', max_tokens: 8 }),
+  });
+
+  assert.equal(JSON.parse(seen).model, 'deepseek-flash');
+});
+
+test('模型映射：非 JSON 请求体不被解析也不被破坏', async (t) => {
+  let seen = null;
+  const upstream = await startServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      seen = Buffer.concat(chunks).toString('utf8');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  });
+
+  const proxy = createProxy({
+    // 两条路径都要验：配了映射走缓冲路径，没配走透传路径
+    getActiveProfile: () => profileFor(upstream.baseUrl, { modelMap: { a: 'b' } }),
+    port: 0,
+  });
+  const proxyPort = await proxy.start();
+
+  t.after(async () => {
+    await proxy.stop();
+    await stopServer(upstream.server);
+  });
+
+  await requestThroughProxy(`http://127.0.0.1:${proxyPort}`, { body: '这是纯文本，不是 JSON' });
+
+  assert.equal(seen, '这是纯文本，不是 JSON');
+});
+
+test('模型映射：连接测试用映射后的目标模型名探测', async (t) => {
+  let seenModel = null;
+  const upstream = await startServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      seenModel = JSON.parse(Buffer.concat(chunks).toString('utf8')).model;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"content":[],"usage":{"input_tokens":1,"output_tokens":1}}');
+    });
+  });
+  t.after(() => stopServer(upstream.server));
+
+  const result = await testUpstream(
+    profileFor(upstream.baseUrl, { modelMap: { 'deepseek-v4-pro': 'deepseek/deepseek-v4-pro' } })
+  );
+
+  // 若用源名去测，供应商必然回 model_not_found，会把正确的配置误报为错误
+  assert.equal(result.ok, true);
+  assert.equal(seenModel, 'deepseek/deepseek-v4-pro');
 });

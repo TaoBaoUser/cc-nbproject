@@ -35,6 +35,27 @@ const DEFAULT_STATE = {
 const FILE_MODE = 0o600;
 const DIR_MODE = 0o700;
 
+/**
+ * 校验并归一化模型映射表。
+ *
+ * 映射表用于解决"同一个模型在不同供应商那里叫法不同"的问题：
+ * Claude Code 发出的是它自己配置里的模型名，而供应商要求的是自己的模型 ID。
+ * 详见 proxy.js 的 rewriteModel。
+ *
+ * 任何非法输入都退化成空对象（表示"不做映射"），而不是抛错 ——
+ * 一个填错的映射规则不该让整个供应商配置无法保存。
+ */
+function sanitizeModelMap(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  for (const [from, to] of Object.entries(raw)) {
+    const source = typeof from === 'string' ? from.trim() : '';
+    const target = to === undefined || to === null ? '' : String(to).trim();
+    if (source && target) out[source] = target;
+  }
+  return out;
+}
+
 function createStore({ dir = DEFAULT_DIR } = {}) {
   const profilesFile = path.join(dir, 'profiles.json');
 
@@ -124,7 +145,7 @@ function createStore({ dir = DEFAULT_DIR } = {}) {
     return state.profiles.find((p) => p.id === id);
   }
 
-  function addProfile({ name, baseUrl, apiKey }) {
+  function addProfile({ name, baseUrl, apiKey, modelMap }) {
     if (!name || !baseUrl) {
       throw new Error('name 与 baseUrl 为必填项');
     }
@@ -134,6 +155,7 @@ function createStore({ dir = DEFAULT_DIR } = {}) {
       name: String(name).trim(),
       baseUrl: String(baseUrl).trim(),
       apiKey: apiKey ? String(apiKey).trim() : '',
+      modelMap: sanitizeModelMap(modelMap),
       createdAt: new Date().toISOString(),
     };
     state.profiles.push(profile);
@@ -157,6 +179,10 @@ function createStore({ dir = DEFAULT_DIR } = {}) {
       if (patch[key] !== undefined) {
         state.profiles[idx][key] = String(patch[key]).trim();
       }
+    }
+    // modelMap 是对象，不能走上面的 String() 路径
+    if (patch.modelMap !== undefined) {
+      state.profiles[idx].modelMap = sanitizeModelMap(patch.modelMap);
     }
     save(state);
     return state.profiles[idx];
