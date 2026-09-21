@@ -8,6 +8,9 @@
  */
 'use strict';
 
+const tseslint = require('typescript-eslint');
+const reactHooks = require('eslint-plugin-react-hooks');
+
 // Node.js 环境可用的全局变量（主进程 / preload / 测试 / 配置文件）
 const nodeGlobals = {
   require: 'readonly',
@@ -70,24 +73,10 @@ module.exports = [
     },
   },
   {
-    // 渲染进程：浏览器环境，且以 <script> 标签直接加载，因此是 script 而非 module
-    files: ['src/renderer/**/*.js'],
-    languageOptions: {
-      sourceType: 'script',
-      globals: {
-        ...browserGlobals,
-        // 由 model-map.js 定义、app.js 使用。index.html 保证前者先加载，
-        // 但 ESLint 只看单个文件，所以必须在这里声明，否则 app.js 会误报 no-undef。
-        parseModelMap: 'readonly',
-        findModelMapProblems: 'readonly',
-        suggestModelMapping: 'readonly',
-      },
-    },
-  },
-  {
     /*
-     * 唯一的例外：model-map.js 同时被渲染进程（<script> 标签）和
-     * node --test（require）加载。它用 `typeof module !== 'undefined'` 守卫
+     * 唯一的例外：model-map.js 同时被渲染进程（经 Vite 打包，见 vite.config.ts
+     * 的 cjsModelMap 插件）和 node --test（require）加载。
+     * 它用 `typeof module !== 'undefined'` 守卫
      * 那行导出语句，浏览器里永远不会执行到，所以这里放行 module 是安全的。
      * 加这条例外是为了换来"这段解析逻辑有单元测试"——它曾经静默写坏过配置。
      */
@@ -95,5 +84,38 @@ module.exports = [
     languageOptions: {
       globals: { ...browserGlobals, module: 'readonly' },
     },
+  },
+  /*
+   * 渲染进程的 TypeScript 部分（React + Vite）。
+   *
+   * 这里不装 eslint-plugin-react：它至今仍把 peer 卡在 eslint <= 9，
+   * 与本项目的 eslint 10 装不到一起。收益也很有限 —— 新 JSX transform 下
+   * 不需要 import React，插件里最常用的 react/react-in-jsx-scope 已经没意义；
+   * 真正值钱的是 react-hooks（依赖数组漏项、条件调用 Hook 这类错误），
+   * 它本身支持 eslint 10，所以只取它。
+   *
+   * tseslint 的预设是"配置数组"，扁平配置里没有 extends，只能就地展开；
+   * 展开后必须补上 files，否则它会漏到 .js 上去。
+   */
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: ['**/*.ts', '**/*.tsx'],
+  })),
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      // TS 自己就能查出未定义标识符，no-undef 在 .ts 上只会误报类型声明
+      globals: { ...browserGlobals },
+    },
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    // 构建配置跑在 Node 环境（vite.config.ts 用 defineConfig + 读路径）
+    files: ['vite.config.ts', 'scripts/**/*.mjs'],
+    languageOptions: { globals: { ...nodeGlobals } },
   },
 ];

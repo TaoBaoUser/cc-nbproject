@@ -25,8 +25,16 @@ const DEFAULT_STATE = {
   profiles: [],
   settings: {
     port: 8787,
+    // 本地代理的准入凭证。见 getLocalToken()。
+    localToken: null,
+    // 接管状态的快照。结构见 docs/plans/2026-09-21-接管与还原-prd.md 第 3.1 节。
+    // null 表示从未接管过。
+    takeover: null,
   },
 };
+
+/** 本地准入凭证的长度（字节）。32 字节 = 256 位，口令学上远超暴力枚举。 */
+const LOCAL_TOKEN_BYTES = 32;
 
 /**
  * 文件权限：仅所有者可读写。
@@ -206,6 +214,66 @@ function createStore({ dir = DEFAULT_DIR } = {}) {
     return load().settings;
   }
 
+  /**
+   * 取出本地代理的准入凭证，没有就生成一个并落盘。
+   *
+   * **为什么需要它**：代理监听在 127.0.0.1 上，本意是「只有本机能访问」。
+   * 但「本机」不等于「本用户」—— 同一台机器上的任何进程、任何账户，只要能连
+   * 127.0.0.1:8787，就能让代理拿**用户真实的 API key** 去发请求并计费。
+   * 而代理原先刻意丢弃客户端凭证、无条件换成 profile.apiKey，等于一个敞开的中转站。
+   *
+   * 修法是把「凭证」变成只有本工具与 Claude Code 知道的一次性随机值：
+   * 接管时把它写进 Claude Code 的 ANTHROPIC_AUTH_TOKEN，代理只认它。
+   * 于是同机的其它进程即使发现端口也过不了准入。
+   *
+   * 凭证与 API key 同存于 profiles.json（权限 0600），不增加新的暴露面 ——
+   * 能读到这个文件的人本来就已经拿到了所有真实 key。
+   */
+  function getLocalToken() {
+    const state = load();
+    const existing = state.settings.localToken;
+    if (typeof existing === 'string' && existing) return existing;
+
+    // randomUUID 的熵对本地准入够用，但它是 122 位且带固定格式；
+    // 直接取 32 字节随机数的十六进制，位数更宽也更难被猜到规律。
+    const token = crypto.randomBytes(LOCAL_TOKEN_BYTES).toString('hex');
+    state.settings.localToken = token;
+    save(state);
+    return token;
+  }
+
+  /** 读取接管状态快照；从未接管过时返回 null。 */
+  function getTakeover() {
+    const value = load().settings.takeover;
+    return value && typeof value === 'object' ? value : null;
+  }
+
+  /** 整体替换接管状态。传 null 表示清除（断开接入成功之后）。 */
+  function setTakeover(next) {
+    const state = load();
+    state.settings.takeover = next || null;
+    save(state);
+    return state.settings.takeover;
+  }
+
+  /**
+   * 合并式更新接管状态。
+   *
+   * 接管状态是「读文件 → 算 → 写文件 → 写状态」这串复合动作的产物，
+   * 各处只会更新自己那几个字段（applied / previous 在接管时刷新，
+   * lastRestore 在退出时刷新）。用合并而不是整份覆盖，避免某个调用点
+   * 漏带字段时把别人的成果抹掉 —— 比如把 previous 冲成 undefined，
+   * 下一次还原就没有目标可回了。
+   */
+  function patchTakeover(patch) {
+    const state = load();
+    const current = state.settings.takeover;
+    const base = current && typeof current === 'object' ? current : {};
+    state.settings.takeover = { ...base, ...patch };
+    save(state);
+    return state.settings.takeover;
+  }
+
   return {
     dir,
     profilesFile,
@@ -218,6 +286,10 @@ function createStore({ dir = DEFAULT_DIR } = {}) {
     updateProfile,
     removeProfile,
     getSettings,
+    getLocalToken,
+    getTakeover,
+    setTakeover,
+    patchTakeover,
   };
 }
 

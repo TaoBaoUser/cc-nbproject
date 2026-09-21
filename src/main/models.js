@@ -18,6 +18,7 @@ const https = require('https');
 // 复用 proxy.js 里的错误摘要：各家错误体形状不一，这里要处理的是同一类问题。
 // proxy.js 不依赖本模块，因此不构成循环依赖。
 const { summarizeUpstreamError } = require('./proxy');
+const { getAgent, describeProxyError } = require('./proxy-agent');
 
 const DEFAULT_TIMEOUT_MS = 20000;
 
@@ -94,6 +95,7 @@ function requestModels({ baseUrl, apiKey, timeoutMs = DEFAULT_TIMEOUT_MS }) {
         path: basePath + '/v1/models',
         method: 'GET',
         headers,
+        agent: getAgent(target.hostname, isTls),
       },
       (res) => {
         const chunks = [];
@@ -166,7 +168,7 @@ function requestModels({ baseUrl, apiKey, timeoutMs = DEFAULT_TIMEOUT_MS }) {
     });
 
     req.on('error', (err) => {
-      resolve({ ok: false, kind: 'network_error', message: err.message });
+      resolve({ ok: false, kind: 'network_error', message: describeProxyError(err) || err.message });
     });
 
     req.end();

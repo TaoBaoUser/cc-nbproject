@@ -22,6 +22,7 @@ const {
   normalizeModelMap,
   rewriteModel,
   summarizeUpstreamError,
+  holdsLocalToken,
 } = require('../src/main/proxy.js');
 
 /** 起一个测试用的假上游服务器，端口交给操作系统随机分配。 */
@@ -577,4 +578,346 @@ test('模型映射：连接测试用映射后的目标模型名探测', async (t
   // 若用源名去测，供应商必然回 model_not_found，会把正确的配置误报为错误
   assert.equal(result.ok, true);
   assert.equal(seenModel, 'deepseek/deepseek-v4-pro');
+});
+
+// ---------------------------------------------------------------------------
+// 9. 逐个候选探测 —— 第一条映射不可用时，不该把整份配置判成坏的
+//
+// 起因：OpenRouter 用户的映射第一条是图像模型，而该模型被地区封锁（403
+// permission_error）。旧实现固定取第一条的目标名去探测，于是「key、地址、
+// 映射全对」的一份配置被显示成「认证失败，请检查 API key」。
+// ---------------------------------------------------------------------------
+
+test('连接测试：403 的 permission_error 不再被误报成认证失败', async (t) => {
+  const upstream = await startServer((req, res) => {
+    // OpenRouter 地区封锁的真实响应形状
+    res.writeHead(403, { 'content-type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        type: 'error',
+        error: {
+          type: 'permission_error',
+          message: 'This model is not available in your region.',
+          error_type: 'permission_denied',
+        },
+      })
+    );
+  });
+  t.after(() => stopServer(upstream.server));
+
+  const result = await testUpstream(profileFor(upstream.baseUrl));
+
+  assert.equal(result.ok, false);
+  // key 是好的，问题在那个模型；报成 auth_failed 会让用户去反复换 key
+  assert.equal(result.kind, 'model_unavailable');
+});
+
+test('连接测试：403 但不是权限问题时仍然是认证失败', async (t) => {
+  const upstream = await startServer((req, res) => {
+    res.writeHead(403, { 'content-type': 'application/json' });
+    res.end('{"error":{"type":"authentication_error","message":"invalid token"}}');
+  });
+  t.after(() => stopServer(upstream.server));
+
+  const result = await testUpstream(profileFor(upstream.baseUrl));
+
+  assert.equal(result.kind, 'auth_failed');
+});
+
+test('连接测试：第一条候选不可用时，自动改试下一条并测通', async (t) => {
+  const seenModels = [];
+  const upstream = await startServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      const model = JSON.parse(Buffer.concat(chunks).toString('utf8')).model;
+      seenModels.push(model);
+      if (model === 'openai/gpt-5.4-image-2') {
+        // 这条在用户所在地区被封锁 —— 但整份配置本身完全正确
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end('{"error":{"type":"permission_error","message":"not available in your region"}}');
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"content":[],"usage":{"input_tokens":1,"output_tokens":1}}');
+    });
+  });
+  t.after(() => stopServer(upstream.server));
+
+  const result = await testUpstream(
+    profileFor(upstream.baseUrl, {
+      modelMap: {
+        'gpt-5.4-image-2': 'openai/gpt-5.4-image-2',
+        'deepseek-v4-pro': 'deepseek/deepseek-v4-pro',
+      },
+    })
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.probedModel, 'deepseek/deepseek-v4-pro');
+  // 第一条确实试过、也确实失败了，然后才轮到第二条
+  assert.deepEqual(seenModels, ['openai/gpt-5.4-image-2', 'deepseek/deepseek-v4-pro']);
+});
+
+test('连接测试：全部候选都失败时，逐条结论都被保留下来', async (t) => {
+  const upstream = await startServer((req, res) => {
+    res.writeHead(403, { 'content-type': 'application/json' });
+    res.end('{"error":{"type":"permission_error","message":"not available in your region"}}');
+  });
+  t.after(() => stopServer(upstream.server));
+
+  const result = await testUpstream(
+    profileFor(upstream.baseUrl, { modelMap: { a: 'vendor/a', b: 'vendor/b' } })
+  );
+
+  assert.equal(result.ok, false);
+  // 清一色是模型不可用 —— 结论就该落在模型上，而不是 key 上
+  assert.equal(result.kind, 'model_unavailable');
+  assert.deepEqual(result.tried, ['vendor/a', 'vendor/b']);
+  assert.deepEqual(
+    result.failures.map((f) => f.model),
+    ['vendor/a', 'vendor/b']
+  );
+});
+
+test('连接测试：混合失败时，认证问题优先于模型问题', async (t) => {
+  const upstream = await startServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      const model = JSON.parse(Buffer.concat(chunks).toString('utf8')).model;
+      if (model === 'vendor/a') {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end('{"error":{"type":"permission_error","message":"region"}}');
+        return;
+      }
+      // 另一个候选直说 key 不对 —— 这是全盘性问题，先让用户去查 key
+      res.writeHead(401, { 'content-type': 'application/json' });
+      res.end('{"error":{"message":"invalid api key"}}');
+    });
+  });
+  t.after(() => stopServer(upstream.server));
+
+  const result = await testUpstream(
+    profileFor(upstream.baseUrl, { modelMap: { a: 'vendor/a', b: 'vendor/b' } })
+  );
+
+  assert.equal(result.kind, 'auth_failed');
+});
+
+test('连接测试：两条规则指向同一个目标名时只探测一次', async (t) => {
+  let requestCount = 0;
+  const upstream = await startServer((req, res) => {
+    req.on('data', () => {
+      // 扔掉请求体即可
+    });
+    req.on('end', () => {
+      requestCount += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"content":[]}');
+    });
+  });
+  t.after(() => stopServer(upstream.server));
+
+  await testUpstream(
+    profileFor(upstream.baseUrl, { modelMap: { x: 'same/model', y: 'same/model' } })
+  );
+
+  assert.equal(requestCount, 1);
+});
+
+// ---------------------------------------------------------------------------
+// 8. 本地准入凭证
+//
+// 代理监听在 127.0.0.1 上，但「本机」不等于「本用户」：同一台机器上的任何进程
+// 都能连 127.0.0.1:8787，而代理原先刻意丢弃客户端凭证、无条件换成 profile.apiKey，
+// 等于一个敞开的中转站 —— 别人可以借它白用用户的真实 key。
+// ---------------------------------------------------------------------------
+
+/** 测试用的本地准入凭证。 */
+const LOCAL_TOKEN = 'a1b2c3d4'.repeat(8);
+
+test('holdsLocalToken：Bearer 与 x-api-key 两种带法都认，其余一律拒绝', () => {
+  const req = (headers) => ({ headers });
+
+  assert.equal(holdsLocalToken(req({ authorization: `Bearer ${LOCAL_TOKEN}` }), LOCAL_TOKEN), true);
+  assert.equal(holdsLocalToken(req({ authorization: `bearer ${LOCAL_TOKEN}` }), LOCAL_TOKEN), true);
+  assert.equal(holdsLocalToken(req({ 'x-api-key': LOCAL_TOKEN }), LOCAL_TOKEN), true);
+
+  assert.equal(holdsLocalToken(req({}), LOCAL_TOKEN), false);
+  assert.equal(holdsLocalToken(req({ authorization: 'Bearer 别的值' }), LOCAL_TOKEN), false);
+  assert.equal(holdsLocalToken(req({ 'x-api-key': '别的值' }), LOCAL_TOKEN), false);
+  // 少了 Bearer 前缀就不是一个合法的 Authorization 头
+  assert.equal(holdsLocalToken(req({ authorization: LOCAL_TOKEN }), LOCAL_TOKEN), false);
+  // 空值绝不能等同于「放行」
+  assert.equal(holdsLocalToken(req({ 'x-api-key': '' }), LOCAL_TOKEN), false);
+  assert.equal(holdsLocalToken(req({ authorization: 'Bearer ' }), LOCAL_TOKEN), false);
+});
+
+test('准入：没带凭证的请求被 401 挡下，且根本不会消耗用户的真实 key', async (t) => {
+  let upstreamHits = 0;
+  const upstream = await startServer((req, res) => {
+    upstreamHits += 1;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"content":[]}');
+  });
+
+  const proxy = createProxy({
+    getActiveProfile: () => profileFor(upstream.baseUrl),
+    getLocalToken: () => LOCAL_TOKEN,
+    port: 0,
+  });
+  const proxyPort = await proxy.start();
+  t.after(async () => {
+    await proxy.stop();
+    await stopServer(upstream.server);
+  });
+
+  const denied = await requestThroughProxy(`http://127.0.0.1:${proxyPort}`);
+
+  assert.equal(denied.status, 401);
+  assert.match(denied.body, /unauthorized/);
+  // 这一条才是要点：被挡下的请求一次上游都没打过去
+  assert.equal(upstreamHits, 0);
+});
+
+test('准入：带上正确凭证即放行，且发往上游的仍是 profile 里的真实 key', async (t) => {
+  let seenAuth = null;
+  const upstream = await startServer((req, res) => {
+    seenAuth = req.headers['x-api-key'] || req.headers.authorization || null;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"content":[]}');
+  });
+
+  const proxy = createProxy({
+    getActiveProfile: () => profileFor(upstream.baseUrl),
+    getLocalToken: () => LOCAL_TOKEN,
+    port: 0,
+  });
+  const proxyPort = await proxy.start();
+  t.after(async () => {
+    await proxy.stop();
+    await stopServer(upstream.server);
+  });
+
+  for (const headers of [
+    { authorization: `Bearer ${LOCAL_TOKEN}` },
+    { 'x-api-key': LOCAL_TOKEN },
+  ]) {
+    const ok = await requestThroughProxy(`http://127.0.0.1:${proxyPort}`, { headers });
+    assert.equal(ok.status, 200);
+  }
+
+  // 准入凭证只是门票：它绝不能代替真实 key 被转发出去。
+  // 否则「改用随机凭证」就退化成了换个名字的公开常量。
+  assert.notEqual(seenAuth, LOCAL_TOKEN);
+  assert.match(seenAuth, /sk-real-key-from-profile/);
+});
+
+test('准入：未配置凭证时不校验（测试与旧行为兼容）', async (t) => {
+  const upstream = await startServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"content":[]}');
+  });
+
+  const proxy = createProxy({ getActiveProfile: () => profileFor(upstream.baseUrl), port: 0 });
+  const proxyPort = await proxy.start();
+  t.after(async () => {
+    await proxy.stop();
+    await stopServer(upstream.server);
+  });
+
+  const result = await requestThroughProxy(`http://127.0.0.1:${proxyPort}`);
+  assert.equal(result.status, 200);
+});
+
+// ---------------------------------------------------------------------------
+// 9. 生命周期：起不来要能重试，关得掉要有时限
+// ---------------------------------------------------------------------------
+
+test('读取供应商配置抛错时返回 500 config_unreadable，而不是让主进程崩掉', async (t) => {
+  const proxy = createProxy({
+    getActiveProfile: () => {
+      throw new Error('配置文件损坏，无法解析');
+    },
+    port: 0,
+  });
+  const proxyPort = await proxy.start();
+  t.after(() => proxy.stop());
+
+  const result = await requestThroughProxy(`http://127.0.0.1:${proxyPort}`);
+
+  // 这个异常若穿透 http 监听器，会变成主进程的未捕获异常 ——
+  // 整个应用连同代理一起消失，而客户端只看到连接被重置
+  assert.equal(result.status, 500);
+  assert.match(result.body, /config_unreadable/);
+  assert.match(result.body, /配置文件损坏/);
+});
+
+test('启动失败后状态被清空，再次 start() 仍会真的重试而不是静默返回 null', async () => {
+  // 192.0.2.0/24 是 TEST-NET-1，本机不可能绑定成功
+  const proxy = createProxy({ getActiveProfile: () => null, host: '192.0.2.1', port: 8787 });
+
+  await assert.rejects(() => proxy.start());
+  assert.equal(proxy.port, null);
+  assert.equal(proxy.baseUrl, null);
+
+  // 关键回归点：失败时若不把 server 清回去，第二次 start() 会命中
+  // `if (server) return actualPort` 直接返回 null —— 不报错也不重试，
+  // 界面上那个「重试」按钮于是点不动
+  await assert.rejects(() => proxy.start());
+});
+
+test('停止代理：有连接挂着时也在超时内返回，不会把退出流程拖死', async (t) => {
+  // 一个永不响应的上游，用来制造一条挂住的长连接
+  const upstream = await startServer(() => {
+    // 故意不响应
+  });
+  t.after(async () => {
+    upstream.server.closeAllConnections?.();
+    await stopServer(upstream.server);
+  });
+
+  const proxy = createProxy({ getActiveProfile: () => profileFor(upstream.baseUrl), port: 0 });
+  const proxyPort = await proxy.start();
+
+  const hanging = http.request({
+    hostname: '127.0.0.1',
+    port: proxyPort,
+    path: '/v1/messages',
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    agent: false,
+  });
+  hanging.on('error', () => {
+    // 被 closeAllConnections 掐断是预期结果
+  });
+  hanging.end('{}');
+  await new Promise((resolve) => setTimeout(resolve, 120));
+
+  const startedAt = Date.now();
+  await proxy.stop({ timeoutMs: 200 });
+  const elapsed = Date.now() - startedAt;
+
+  // server.close() 要等所有连接结束才回调，而转发路径没有超时 ——
+  // 没有这个上界的话，退出流程会 await 到天荒地老
+  assert.ok(elapsed < 1500, `stop() 应在超时附近返回，实际用了 ${elapsed}ms`);
+  assert.equal(proxy.port, null);
+  assert.equal(proxy.baseUrl, null);
+  hanging.destroy();
+});
+
+test('停止后再启动：能重新监听（退出流程与重试共用同一条路径）', async (t) => {
+  const proxy = createProxy({ getActiveProfile: () => null, port: 0 });
+
+  const first = await proxy.start();
+  await proxy.stop();
+  assert.equal(proxy.port, null);
+
+  const second = await proxy.start();
+  t.after(() => proxy.stop());
+
+  assert.ok(second > 0, '停止后必须能重新启动');
+  assert.equal(proxy.baseUrl, `http://127.0.0.1:${second}`);
+  assert.notEqual(first, undefined);
 });

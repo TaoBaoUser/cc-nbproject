@@ -21,6 +21,7 @@
 const http = require('http');
 const https = require('https');
 const { StringDecoder } = require('string_decoder');
+const { getAgent, describeProxyError } = require('./proxy-agent');
 
 /**
  * 逐跳首部（hop-by-hop headers）：这些首部只对单次 TCP 连接有意义，
@@ -39,6 +40,32 @@ const HOP_BY_HOP_HEADERS = new Set([
 
 /** 非流式响应的累积上限：超过后放弃用量解析，但继续正常转发。 */
 const MAX_ACCUMULATE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * 判断请求是否持有本地准入凭证。
+ *
+ * **为什么代理需要校验来客**：它监听在 127.0.0.1 上，本意是「只有本机能访问」。
+ * 但「本机」不等于「本用户」—— 同一台机器上的任何进程、任何账户，只要能连上
+ * 这个端口，就能让代理拿**用户真实的 API key** 去发请求并计费。而代理原先刻意
+ * 丢弃客户端凭证、无条件换成 profile.apiKey，等于一个对同机全开的中转站。
+ *
+ * 凭证由 store.js 的 getLocalToken 生成并写进 Claude Code 的 ANTHROPIC_AUTH_TOKEN，
+ * 只有本工具与被接管的 Claude Code 知道。
+ *
+ * 两个头都认：Anthropic 客户端把 ANTHROPIC_AUTH_TOKEN 放在
+ * `Authorization: Bearer <token>`，部分实现走 `x-api-key`。
+ *
+ * 用普通字符串比较而非 timingSafeEqual：这里防的是「同机进程发现端口后顺手白用
+ * 你的 key」，不是能反复测量响应时间的远程攻击者 —— 对一个 256 位随机数来说，
+ * 猜测成功率与测量精度无关。
+ */
+function holdsLocalToken(req, token) {
+  const headers = req.headers || {};
+  const bearer = /^bearer\s+(.+)$/i.exec(headers.authorization || '');
+  const viaBearer = bearer ? bearer[1].trim() : '';
+  const viaApiKey = typeof headers['x-api-key'] === 'string' ? headers['x-api-key'].trim() : '';
+  return viaBearer === token || viaApiKey === token;
+}
 
 function filterHeaders(rawHeaders, alsoDrop = []) {
   const out = {};
@@ -190,7 +217,12 @@ function listenWithFallback(server, startPort, host, maxAttempts = 20) {
     let attempt = 0;
 
     const tryListen = () => {
+      // 两个监听器都必须显式摘掉。只摘 'error' 是不够的：`listen(port, host, cb)`
+      // 把 cb 实现为一次性的 'listening' 监听器，端口被占时它永不触发、
+      // 也永不被移除。连续回退 20 次就会在同一个 server 上堆 20 个死监听器，
+      // Node 会以 MaxListenersExceededWarning 警告潜在的内存泄漏。
       const onError = (err) => {
+        cleanup();
         if (err.code === 'EADDRINUSE' && attempt < maxAttempts) {
           attempt += 1;
           tryListen();
@@ -199,13 +231,21 @@ function listenWithFallback(server, startPort, host, maxAttempts = 20) {
         }
       };
 
-      server.once('error', onError);
-      server.listen(startPort + attempt, host, () => {
-        server.removeListener('error', onError);
+      const onListening = () => {
+        cleanup();
         // 用 server.address().port 而不是 startPort + attempt：
         // 当传入 0 时由操作系统分配随机端口，直接计算会返回错误的端口号。
         resolve(server.address().port);
-      });
+      };
+
+      const cleanup = () => {
+        server.removeListener('error', onError);
+        server.removeListener('listening', onListening);
+      };
+
+      server.once('error', onError);
+      server.once('listening', onListening);
+      server.listen(startPort + attempt, host);
     };
 
     tryListen();
@@ -217,6 +257,7 @@ function listenWithFallback(server, startPort, host, maxAttempts = 20) {
  *
  * @param {object}   deps
  * @param {Function} deps.getActiveProfile  返回当前选中的供应商，或 null
+ * @param {Function} [deps.getLocalToken]   返回本地准入凭证；返回 null/不传则不做校验
  * @param {Function} [deps.onUsage]         每完成一个请求的回调，参数为用量记录
  * @param {Function} [deps.onRequest]       请求开始/结束的回调，供 UI 实时日志使用
  * @param {string}   [deps.host]            监听地址，默认 127.0.0.1
@@ -224,6 +265,7 @@ function listenWithFallback(server, startPort, host, maxAttempts = 20) {
  */
 function createProxy({
   getActiveProfile,
+  getLocalToken = null,
   onUsage = () => {},
   onRequest = () => {},
   host = '127.0.0.1',
@@ -247,7 +289,39 @@ function createProxy({
 
   function handleRequest(clientReq, clientRes) {
     const startedAt = Date.now();
-    const profile = getActiveProfile();
+
+    // 准入校验。见 holdsLocalToken 与 store.js 的 getLocalToken。
+    const localToken = typeof getLocalToken === 'function' ? getLocalToken() : null;
+    if (localToken && !holdsLocalToken(clientReq, localToken)) {
+      sendJson(clientRes, 401, {
+        type: 'error',
+        error: {
+          type: 'unauthorized',
+          message:
+            '缺少或不匹配的本地准入凭证。本代理只服务于被 cc-nbproject 接管的 Claude Code。',
+        },
+      });
+      return;
+    }
+
+    let profile;
+    try {
+      profile = getActiveProfile();
+    } catch (err) {
+      // 配置文件损坏（profiles.json 不是合法 JSON）时，这个异常绝不能穿透
+      // http 请求监听器 —— 那会变成主进程的未捕获异常，整个应用连同正在跑的
+      // 代理一起消失，而客户端只是连接被重置、拿不到任何可解释的响应。
+      // 转成一条 500，让用户看到原因，也让应用活着把界面上的提示显示出来。
+      onRequest({ phase: 'error', error: err.message, profileName: null });
+      sendJson(clientRes, 500, {
+        type: 'error',
+        error: {
+          type: 'config_unreadable',
+          message: `读取供应商配置失败：${err.message}`,
+        },
+      });
+      return;
+    }
 
     if (!profile) {
       sendJson(clientRes, 503, {
@@ -415,13 +489,16 @@ function createProxy({
           path: targetPath,
           method: clientReq.method,
           headers: buildHeaders(bodyBuffer ? Buffer.byteLength(bodyBuffer) : null),
+          // 系统开着代理时走代理；本地/内网地址与没代理时这里是 undefined，即直连
+          agent: getAgent(upstreamUrl.hostname, isTls),
         },
         onUpstreamResponse
       );
       upstreamReqRef = upstreamReq;
 
       upstreamReq.on('error', (err) => {
-        onRequest({ phase: 'error', error: err.message, profileName: profile.name });
+        const proxyNote = describeProxyError(err);
+        onRequest({ phase: 'error', error: proxyNote || err.message, profileName: profile.name });
         if (clientRes.headersSent) {
           clientRes.destroy();
           return;
@@ -429,8 +506,8 @@ function createProxy({
         sendJson(clientRes, 502, {
           type: 'error',
           error: {
-            type: 'upstream_unreachable',
-            message: `无法连接供应商「${profile.name}」：${err.message}`,
+            type: proxyNote ? 'proxy_unreachable' : 'upstream_unreachable',
+            message: proxyNote || `无法连接供应商「${profile.name}」：${err.message}`,
           },
         });
       });
@@ -481,16 +558,57 @@ function createProxy({
 
   async function start() {
     if (server) return actualPort;
-    server = http.createServer(handleRequest);
-    actualPort = await listenWithFallback(server, port, host);
+
+    // 先创建、再监听，但失败时**必须**把 server 清回去。
+    // 否则下一次 start() 会命中上面那行 `if (server) return actualPort`，
+    // 直接返回 null —— 既不报错也不重新监听，界面上的「重试」按钮于是点不动。
+    const candidate = http.createServer(handleRequest);
+    server = candidate;
+    try {
+      actualPort = await listenWithFallback(candidate, port, host);
+    } catch (err) {
+      server = null;
+      actualPort = null;
+      // 半开的实例要关掉，否则它持有的 handle 会拖住进程退出
+      try {
+        candidate.close();
+      } catch {
+        // 从未成功监听，close 可能直接抛错，忽略
+      }
+      throw err;
+    }
     return actualPort;
   }
 
-  async function stop() {
+  /**
+   * 停止监听。
+   *
+   * `server.close()` 要等**所有已建立的连接结束**才回调。代理给 Claude Code
+   * 服务的那条转发路径没有任何超时，用户正开着会话（SSE 长连接）时这个等待
+   * 没有上界 —— 而退出流程会 await 它，表现为「关掉窗口后应用再也退不掉」。
+   *
+   * 所以这里给 close 加一个有界的等待，超时后主动掐掉存量连接。
+   */
+  async function stop({ timeoutMs = 2000 } = {}) {
     if (!server) return;
-    await new Promise((resolve) => server.close(resolve));
+    const closing = server;
+    // 先清引用：close() 可能永远不回调，留着的话之后的 start() 会被挡住
     server = null;
     actualPort = null;
+
+    await new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        if (typeof closing.closeAllConnections === 'function') {
+          closing.closeAllConnections();
+        }
+        resolve();
+      }, timeoutMs);
+
+      closing.close(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
   }
 
   return {
@@ -545,44 +663,85 @@ function summarizeUpstreamError(text) {
 }
 
 /**
- * 连接测试：向指定供应商发一个最小的真实请求，验证端点可达、凭证有效。
+ * 从上游的错误响应体里取 error.type。
  *
- * 为什么不用 GET /v1/models 之类的轻量接口：Anthropic 兼容实现的覆盖面参差不齐，
- * /v1/models 未必存在，而 /v1/messages 是所有兼容实现都必须支持的。
- *
- * 返回值区分了几种失败原因，因为对用户的行动指引完全不同：
- *   - 认证失败 → 去检查 API key
- *   - 模型不存在 → key 大概率是好的，去检查模型名
- *   - 网络不可达 → 去检查 baseUrl 和网络
+ * 403 有两种完全不同的含义，只能靠这个字段区分开：
+ *   permission_error      → 模型在该地区/该账号下不可用（key 本身是好的）
+ *   authentication_error  → 凭证问题
+ * 只看状态码会把两者混为一谈。
  */
-async function testUpstream(
-  profile,
-  { timeoutMs = 20000, model = 'claude-3-5-haiku-20241022' } = {}
-) {
-  const startedAt = Date.now();
+function pickErrorType(text) {
+  try {
+    const json = JSON.parse(text);
+    const type = json && json.error && json.error.type;
+    return typeof type === 'string' ? type : null;
+  } catch {
+    return null;
+  }
+}
 
-  return new Promise((resolve) => {
-    let upstreamUrl;
-    try {
-      upstreamUrl = new URL(profile.baseUrl);
-    } catch {
-      resolve({ ok: false, kind: 'invalid_url', message: 'baseUrl 不是合法 URL', durationMs: 0 });
-      return;
+/**
+ * 把一次探测的失败响应归类。
+ *
+ * 401 与 403 必须分开。以前两者一律归成 auth_failed，于是 OpenRouter 回的
+ * 「该模型在你的地区不可用」（403 + permission_error）被显示成
+ * 「认证失败，请检查 API key」—— 用户拿着一个完全正常的 key 反复自查，
+ * 而真正的问题是他探测的那个模型在自己所在地区没开放。
+ */
+function classifyFailure(status, text, durationMs) {
+  const summary = summarizeUpstreamError(text);
+
+  if (status === 401) {
+    return {
+      ok: false,
+      kind: 'auth_failed',
+      status,
+      durationMs,
+      message: '认证失败，请检查 API key',
+    };
+  }
+
+  if (status === 403) {
+    const type = pickErrorType(text);
+    const isPermissionOrRegion =
+      type === 'permission_error' || /region|not available|permission|地区/i.test(summary);
+    if (isPermissionOrRegion) {
+      // 保留上游原话：里面通常带着 region、model 这类可供搜索的关键词
+      return {
+        ok: false,
+        kind: 'model_unavailable',
+        status,
+        durationMs,
+        message: summary.slice(0, 500),
+      };
     }
+    return {
+      ok: false,
+      kind: 'auth_failed',
+      status,
+      durationMs,
+      message: '认证失败，请检查 API key',
+    };
+  }
 
-    const isTls = upstreamUrl.protocol === 'https:';
-    const transport = isTls ? https : http;
-    const basePath = upstreamUrl.pathname.replace(/\/+$/, '');
+  // 400/404 常见于模型名不对，但说明端点和凭证已经通过了校验
+  const looksLikeModelIssue = /model|模型/i.test(text);
+  return {
+    ok: false,
+    kind: looksLikeModelIssue ? 'model_not_found' : 'upstream_error',
+    status,
+    durationMs,
+    // 保留上游原话而不是自造一句，否则用户拿不到可搜索的关键词
+    message: summary.slice(0, 500),
+  };
+}
 
-    // 配了模型映射时，用映射的「目标」名去探测。
-    // 因为真正会被发给上游的是目标名，用源名去测只会得到一个必然失败的
-    // model_not_found —— 那会把「配置正确」误报成「配置有问题」，
-    // 比不测更糟。取第一条规则的目标名即可：它们指向同一个供应商。
-    const map = normalizeModelMap(profile.modelMap);
-    const probeModel = map ? Object.values(map)[0] : model;
-
+/** 向指定上游发一次最小请求，探测某个模型名。从不抛错，失败也以普通对象返回。 */
+function probeOnce({ upstreamUrl, basePath, transport, isTls, profile, model, timeoutMs }) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
     const body = JSON.stringify({
-      model: probeModel,
+      model,
       max_tokens: 1,
       messages: [{ role: 'user', content: 'ping' }],
     });
@@ -601,6 +760,7 @@ async function testUpstream(
           'x-api-key': profile.apiKey || '',
           authorization: `Bearer ${profile.apiKey || ''}`,
         },
+        agent: getAgent(upstreamUrl.hostname, isTls),
       },
       (res) => {
         const chunks = [];
@@ -613,29 +773,7 @@ async function testUpstream(
             resolve({ ok: true, kind: 'ok', status: res.statusCode, durationMs });
             return;
           }
-
-          if (res.statusCode === 401 || res.statusCode === 403) {
-            resolve({
-              ok: false,
-              kind: 'auth_failed',
-              status: res.statusCode,
-              durationMs,
-              message: '认证失败，请检查 API key',
-            });
-            return;
-          }
-
-          // 400/404 常见于模型名不对，但说明端点和凭证已经通过了校验
-          const summary = summarizeUpstreamError(text);
-          const looksLikeModelIssue = /model|模型/i.test(text);
-          resolve({
-            ok: false,
-            kind: looksLikeModelIssue ? 'model_not_found' : 'upstream_error',
-            status: res.statusCode,
-            durationMs,
-            // 保留上游原话而不是自造一句，否则用户拿不到可搜索的关键词
-            message: summary.slice(0, 500),
-          });
+          resolve(classifyFailure(res.statusCode, text, durationMs));
         });
       }
     );
@@ -649,7 +787,8 @@ async function testUpstream(
         ok: false,
         kind: 'network_error',
         durationMs: Date.now() - startedAt,
-        message: err.message,
+        // 代理自己连不上时，得说清是代理的问题 —— 否则用户会去查 baseUrl 和 key
+        message: describeProxyError(err) || err.message,
       });
     });
 
@@ -657,11 +796,142 @@ async function testUpstream(
   });
 }
 
+/**
+ * 所有候选都失败时，挑一条最能指导用户行动的结论。
+ *
+ * 优先级而不是「取第一个」：auth_failed 与 network_error 是全盘性的问题，
+ * 任何一条命中就说明故障不在模型名上，先让用户去查 key / baseUrl；
+ * 只有当失败的候选清一色是模型相关时，才把话题引到模型上去。
+ */
+const CONCLUSION_PRIORITY = [
+  'auth_failed',
+  'network_error',
+  'model_unavailable',
+  'model_not_found',
+  'upstream_error',
+];
+
+function pickConclusion({ failures, tried, durationMs }) {
+  const allSameKind = failures.every((f) => f.kind === failures[0].kind);
+  const picked = allSameKind
+    ? failures[0]
+    : CONCLUSION_PRIORITY.map((k) => failures.find((f) => f.kind === k)).find(Boolean) || failures[0];
+
+  return {
+    ok: false,
+    kind: picked.kind,
+    status: picked.status,
+    durationMs,
+    message: picked.message,
+    probedModel: picked.model,
+    tried,
+    // 逐条留证：用户配了三条映射时，能一眼看出是哪几条不通、分别为什么
+    failures: failures.map((f) => ({
+      model: f.model,
+      kind: f.kind,
+      status: f.status,
+      message: f.message,
+    })),
+  };
+}
+
+/**
+ * 连接测试：向指定供应商发一个最小的真实请求，验证端点可达、凭证有效。
+ *
+ * 为什么不用 GET /v1/models 之类的轻量接口：Anthropic 兼容实现的覆盖面参差不齐，
+ * /v1/models 未必存在，而 /v1/messages 是所有兼容实现都必须支持的。
+ *
+ * 返回值区分了几种失败原因，因为对用户的行动指引完全不同：
+ *   - 认证失败 → 去检查 API key
+ *   - 模型不存在 / 模型在地区不可用 → key 大概率是好的，去查模型名或换个模型
+ *   - 网络不可达 → 去检查 baseUrl 和网络
+ */
+async function testUpstream(
+  profile,
+  { timeoutMs = 20000, model = 'claude-3-5-haiku-20241022' } = {}
+) {
+  const startedAt = Date.now();
+
+  let upstreamUrl;
+  try {
+    upstreamUrl = new URL(profile.baseUrl);
+  } catch {
+    return { ok: false, kind: 'invalid_url', message: 'baseUrl 不是合法 URL', durationMs: 0 };
+  }
+
+  const isTls = upstreamUrl.protocol === 'https:';
+  const transport = isTls ? https : http;
+  const basePath = upstreamUrl.pathname.replace(/\/+$/, '');
+
+  /*
+   * 逐个探测候选模型，哪个通就用哪个。
+   *
+   * 为什么不只取第一条：映射是用户按用途分组配的，第一条完全可能是图像模型、
+   * 该账号下没权限的模型、或只在部分地区开放的模型。以前固定取第一条的目标名，
+   * 于是「配置完全正确」会被那一个不可用的模型误报成「认证失败」——
+   * 用户拿着好 key 反复自查，而真正能用的模型就排在第二条。
+   *
+   * 配了映射就用映射的「目标」名（那才是真正会发给上游的名字）；
+   * 没配就用默认探测名。
+   */
+  const map = normalizeModelMap(profile.modelMap);
+  const mappedTargets = map ? [...new Set(Object.values(map))] : [];
+  const candidates = mappedTargets.length > 0 ? mappedTargets : [model];
+
+  const tried = [];
+  const failures = [];
+  // 全部候选共享一个总预算，与原来单次请求的时长上限一致 ——
+  // 否则映射配了十条，最坏情况要卡 200 秒。
+  const deadline = startedAt + timeoutMs;
+
+  for (const candidate of candidates) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+
+    const result = await probeOnce({
+      upstreamUrl,
+      basePath,
+      transport,
+      isTls,
+      profile,
+      model: candidate,
+      timeoutMs: remaining,
+    });
+    tried.push(candidate);
+
+    if (result.ok) {
+      // durationMs 报整体耗时：前面试失败的那几次，用户也是实打实等了的
+      return {
+        ...result,
+        durationMs: Date.now() - startedAt,
+        probedModel: candidate,
+        tried,
+      };
+    }
+    failures.push({ model: candidate, ...result });
+  }
+
+  if (failures.length === 0) {
+    // 只会在预算一开始就耗尽（timeoutMs 被设成极小值）时发生
+    return {
+      ok: false,
+      kind: 'network_error',
+      durationMs: Date.now() - startedAt,
+      message: '请求发出前预算就已耗尽',
+      tried,
+    };
+  }
+
+  return pickConclusion({ failures, tried, durationMs: Date.now() - startedAt });
+}
+
 module.exports = {
   createProxy,
   testUpstream,
+  classifyFailure,
   createUsageExtractor,
   filterHeaders,
+  holdsLocalToken,
   normalizeModelMap,
   rewriteModel,
   summarizeUpstreamError,

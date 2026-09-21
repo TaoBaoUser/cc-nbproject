@@ -31,9 +31,13 @@ contextBridge.exposeInMainWorld('ccnb', {
   getRecentUsage: (limit) => ipcRenderer.invoke('usage:recent', limit),
   getProxyStatus: () => ipcRenderer.invoke('proxy:status'),
 
-  // --- Claude Code 配置引导（P4）---
+  // --- Claude Code 接管（P4）---
+  // 通道名与设计文档 3.1 的 claude:apply 不同：接管与还原现已成对，
+  // 单个 "apply" 无法表达「授权一次，之后自动接管」这层语义。
+  getClaudeStatus: () => ipcRenderer.invoke('claude:status'),
   previewClaudeSettings: () => ipcRenderer.invoke('claude:preview'),
-  applyClaudeSettings: () => ipcRenderer.invoke('claude:apply'),
+  takeoverClaude: () => ipcRenderer.invoke('claude:takeover'),
+  disconnectClaude: () => ipcRenderer.invoke('claude:disconnect'),
 
   // --- 模型映射的辅助（见设计文档 6.6）---
   // 拉取供应商的模型列表。传的是表单草稿值，因此新增供应商时也能用。

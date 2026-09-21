@@ -171,6 +171,21 @@ h1 {
   background: var(--danger);
 }
 
+/* 已授权但本次没写进去 —— 既不是正常也不是错误，用警示色区分出来。
+   见 Sidebar 的 CLAUDE_STATE_TEXT。 */
+.status-dot.is-warn {
+  background: var(--warn, #f0b429);
+}
+
+/* 接管状态行：与上面的代理状态行拉开距离，避免读成同一组信息 */
+.claude-line {
+  margin-top: 9px;
+}
+
+.proxy-card .error-text:empty {
+  display: none;
+}
+
 .proxy-url {
   display: block;
   margin: 6px 0 4px;
@@ -694,6 +709,21 @@ h1 {
   color: var(--warning);
 }
 
+/*
+ * 「读不到 Claude Code 模型名」时的那条出路。
+ * 做成下划线文字而不是按钮：它只在异常态出现，不该和「测试/编辑/删除」抢视觉重量。
+ */
+.card-retry {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .card-model-hints {
   display: flex;
   flex-wrap: wrap;
@@ -714,6 +744,71 @@ h1 {
 
 .model-suggest:hover {
   background: rgba(107, 138, 253, 0.12);
+}
+
+/*
+ * ---------- 自写可滚动下拉（替代原生 datalist） ----------
+ *
+ * 原生 datalist 由浏览器渲染，是一个无法滚动、样式不可控的黑盒：
+ * OpenRouter 有 446 个模型时，用户只能在一条固定高度的浮层里用键盘硬顶。
+ * 这里换成普通元素自己画，高度、滚动、筛选全部可控。
+ */
+
+.combobox {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.combobox input {
+  width: 100%;
+}
+
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+/* 下面放不下时朝上展开（末尾卡片贴到视口底部的情形）。
+   阴影方向也翻过来，否则浮层看着像贴在下面。 */
+.combobox-list.is-up {
+  top: auto;
+  bottom: calc(100% + 4px);
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.combobox-option {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.combobox-option.is-highlighted {
+  background: rgba(107, 138, 253, 0.16);
+}
+
+.combobox-option-name {
+  font-size: 11.5px;
+  color: var(--text);
+}
+
+.combobox-option-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: var(--text-dim);
 }
 
 .modal-actions {
