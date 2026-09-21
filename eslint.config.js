@@ -28,6 +28,9 @@ const nodeGlobals = {
   TextDecoder: 'readonly',
   TextEncoder: 'readonly',
   fetch: 'readonly',
+  // Node 22 起是全局变量。scripts/ui-smoke.js 用它走 CDP 驱动真实窗口，
+  // 从而不必为了做 UI 冒烟检查而引入 puppeteer。
+  WebSocket: 'readonly',
 };
 
 // 浏览器环境可用的全局变量（渲染进程）
@@ -77,6 +80,8 @@ module.exports = [
         // 但 ESLint 只看单个文件，所以必须在这里声明，否则 app.js 会误报 no-undef。
         parseModelMap: 'readonly',
         findModelMapProblems: 'readonly',
+        suggestModelMapping: 'readonly',
+        upsertModelMapLine: 'readonly',
       },
     },
   },

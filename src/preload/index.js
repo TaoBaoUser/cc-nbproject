@@ -35,6 +35,12 @@ contextBridge.exposeInMainWorld('ccnb', {
   previewClaudeSettings: () => ipcRenderer.invoke('claude:preview'),
   applyClaudeSettings: () => ipcRenderer.invoke('claude:apply'),
 
+  // --- 模型映射的辅助（见设计文档 6.6）---
+  // 拉取供应商的模型列表。传的是表单草稿值，因此新增供应商时也能用。
+  listModels: (payload) => ipcRenderer.invoke('models:list', payload),
+  // 读 Claude Code 实际会发出的模型名，作为映射的"源"一列
+  getClaudeModelNames: () => ipcRenderer.invoke('claude:modelNames'),
+
   /**
    * 订阅主进程推送的实时日志。
    *

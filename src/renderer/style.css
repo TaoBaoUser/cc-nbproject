@@ -615,6 +615,69 @@ h1 {
   color: var(--warning);
 }
 
+/* ---------- 模型映射辅助区（拉取模型列表，见设计文档 6.6） ---------- */
+
+.model-helper {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.model-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+/*
+ * ⚠️ 这一条不能删，理由和上面 .modal-root[hidden] 完全相同：
+ * 上面那条 display: flex 会压掉 hidden 属性依赖的 UA 样式，
+ * 结果是选择区永远显示着。同一个坑不踩第二次。
+ */
+.model-picker[hidden] {
+  display: none;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.picker-label {
+  flex-shrink: 0;
+  width: 68px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.picker-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.picker-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.picker-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

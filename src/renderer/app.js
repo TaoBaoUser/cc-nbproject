@@ -216,11 +216,169 @@ function closeModal() {
 // parseModelMap / findModelMapProblems 来自 model-map.js（由 index.html 先行加载）。
 // 拆出去是为了让这段解析逻辑有单元测试 —— 它曾静默写坏过用户的配置。
 
+/**
+ * 把「拉取模型列表」失败的原因翻译成用户能照着做的话。
+ *
+ * `unsupported` 是最常见的一种，而且**不是错误** —— 只是这个供应商没有该接口
+ * （实测 DeepSeek 就是 404）。文案必须明确说"请手动填写"，
+ * 否则用户会以为是自己哪里配错了，反复折腾一个根本不存在的东西。
+ */
+function describeFetchFailure(result) {
+  const reasons = {
+    unsupported: '该供应商没有 /v1/models 接口，请手动填写下方的映射',
+    auth_failed: '认证失败 —— 请检查 API key',
+    network_error: `无法连接 —— ${result.message || '网络错误'}`,
+    invalid_url: 'Base URL 不是合法 URL',
+    empty: '接口有响应但没有返回任何模型',
+  };
+  return reasons[result.kind] || result.message || '拉取失败';
+}
+
 function formatModelMap(modelMap) {
   if (!modelMap) return '';
   return Object.entries(modelMap)
     .map(([from, to]) => `${from}=${to}`)
     .join('\n');
+}
+
+/**
+ * 构建「模型映射」下方的辅助区：一个拉取按钮 + 拉取成功后展开的选择区。
+ *
+ * 目标模型用 `<input list>` + `<datalist>` 而不是 `<select>`：OpenRouter 有 446 个模型，
+ * 原生下拉框翻起来是灾难；datalist 能边打边筛，且零依赖。
+ *
+ * 源模型名的候选读自 Claude Code 的 settings.json —— 让用户从**实际会发出的名字**里挑，
+ * 而不是默写。这是从根上消灭"模型名写错"的办法（见设计文档 6.5 / 6.6）。
+ *
+ * 拉取失败不改变任何既有行为：按钮给出原因后，用户照旧手写文本框。
+ */
+function buildModelHelper({ urlInput, keyInput, modelMapInput, refreshMapStatus }) {
+  const wrap = el('div', { className: 'model-helper' });
+
+  const fetchBtn = el('button', {
+    className: 'btn btn-ghost btn-sm',
+    text: '从供应商拉取模型列表',
+    attrs: { type: 'button' },
+  });
+  const status = el('div', { className: 'field-status' });
+
+  // 拉取成功后才展开
+  const picker = el('div', { className: 'model-picker' });
+  picker.hidden = true;
+
+  const targetOptions = el('datalist', { attrs: { id: 'ccnb-target-models' } });
+  const sourceOptions = el('datalist', { attrs: { id: 'ccnb-source-models' } });
+
+  const sourceInput = el('input', {
+    attrs: { type: 'text', list: 'ccnb-source-models', placeholder: '源模型名' },
+  });
+  const targetInput = el('input', {
+    attrs: { type: 'text', list: 'ccnb-target-models', placeholder: '目标模型 ID' },
+  });
+  const addBtn = el('button', {
+    className: 'btn btn-sm btn-primary',
+    text: '添加',
+    attrs: { type: 'button' },
+  });
+
+  let availableModels = [];
+
+  const setStatus = (text, warn = false) => {
+    status.className = warn ? 'field-status is-warn' : 'field-status';
+    status.textContent = text;
+  };
+
+  const applySuggestion = () => {
+    if (availableModels.length === 0) return;
+    const suggestion = suggestModelMapping(
+      sourceInput.value.trim(),
+      availableModels.map((model) => model.id)
+    );
+    // 猜不出来就保持原样，别把用户已经填好的内容清掉
+    if (suggestion) targetInput.value = suggestion;
+  };
+
+  // 源模型名的候选来自 Claude Code 的实际配置
+  window.ccnb
+    .getClaudeModelNames()
+    .then((info) => {
+      if (!info || !info.ok) return;
+      for (const entry of info.entries) {
+        sourceOptions.appendChild(
+          el('option', { attrs: { value: entry.name, label: entry.keys.join(' / ') } })
+        );
+      }
+      if (!sourceInput.value) sourceInput.value = info.entries[0].name;
+    })
+    .catch(() => {
+      // 读不到就退化成普通输入框，用户照样能手填
+    });
+
+  fetchBtn.addEventListener('click', async () => {
+    const baseUrl = urlInput.value.trim();
+    if (!baseUrl) {
+      setStatus('⚠ 请先填写 Base URL', true);
+      return;
+    }
+    fetchBtn.disabled = true;
+    setStatus('正在拉取…');
+    try {
+      const result = await window.ccnb.listModels({ baseUrl, apiKey: keyInput.value.trim() });
+      if (result.ok) {
+        availableModels = result.models;
+        targetOptions.replaceChildren();
+        for (const model of result.models) {
+          targetOptions.appendChild(
+            el('option', { attrs: { value: model.id, label: model.name } })
+          );
+        }
+        picker.hidden = false;
+        setStatus(
+          `已拉取 ${result.models.length} 个模型${result.cached ? '（来自缓存）' : ''}，` +
+            '选好后点「添加」写入上方文本框。'
+        );
+        applySuggestion();
+      } else {
+        availableModels = [];
+        picker.hidden = true;
+        setStatus(`⚠ ${describeFetchFailure(result)}`, true);
+      }
+    } catch (err) {
+      setStatus(`⚠ ${err.message}`, true);
+    } finally {
+      fetchBtn.disabled = false;
+    }
+  });
+
+  sourceInput.addEventListener('input', applySuggestion);
+
+  addBtn.addEventListener('click', () => {
+    const source = sourceInput.value.trim();
+    const target = targetInput.value.trim();
+    if (!source || !target) {
+      setStatus('⚠ 源模型名和目标模型都要填', true);
+      return;
+    }
+    modelMapInput.value = upsertModelMapLine(modelMapInput.value, source, target);
+    refreshMapStatus();
+    targetInput.value = '';
+    setStatus(`已写入：${source} → ${target}`);
+  });
+
+  picker.append(
+    el('div', { className: 'picker-row' }, [
+      el('span', { className: 'picker-label', text: '源模型名' }),
+      sourceInput,
+    ]),
+    el('div', { className: 'picker-row' }, [
+      el('span', { className: 'picker-label', text: '目标模型' }),
+      targetInput,
+    ]),
+    el('div', { className: 'picker-actions' }, [addBtn])
+  );
+
+  wrap.append(fetchBtn, status, sourceOptions, targetOptions, picker);
+  return wrap;
 }
 
 function openProfileModal(profile = null) {
@@ -308,6 +466,7 @@ function openProfileModal(profile = null) {
       '未命中的模型名将原样转发。留空则不启用映射。'
   );
   mapField.appendChild(mapStatus);
+  mapField.appendChild(buildModelHelper({ urlInput, keyInput, modelMapInput, refreshMapStatus }));
   modal.appendChild(mapField);
 
   const errorText = el('div', { className: 'error-text' });

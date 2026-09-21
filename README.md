@@ -34,6 +34,8 @@
 - 用量统计：token 消耗与请求数
 - 模型映射：不同供应商对同一个模型的叫法不同（如 OpenRouter 要求 `vendor/model`），
   在供应商配置里按「源=目标」逐行填写即可，未命中的模型名原样转发
+- 模型列表拉取：从供应商拉取可选模型 ID 自动预填映射（**这是辅助，不是依赖** ——
+  Claude Code 的兼容接口规范里并没有 `/v1/models`，不少供应商没有这个端点，手动填写始终可用）
 
 暂不支持（计划中）：故障转移、系统托盘、应用打包。
 
@@ -80,6 +82,24 @@ npm run lint     # ESLint 检查
 npm run format   # Prettier 格式化
 ```
 
+### 渲染进程冒烟检查
+
+渲染进程没有任何单元测试保护，而它出过两次「代码正确、lint 全绿，但一跑就崩」的问题
+（遮罩层压掉 `hidden`、函数少传参数导致 `TypeError`）。这类问题无法靠单测发现，
+所以有一个连真实窗口去点的冒烟检查：
+
+```bash
+# 终端 A：带调试端口启动
+npx electron . --remote-debugging-port=9222
+
+# 终端 B：驱动它
+npm run smoke            # 默认挑名字含 openrouter 的 profile
+npm run smoke -- <名字片段>
+```
+
+零依赖 —— 用 Chrome DevTools Protocol 直接驱动，Node 自带的 `fetch` / `WebSocket` 就够，
+不引入 puppeteer。详见[设计文档 9.1](docs/plans/2026-09-21-cc-nbproject-design.md)。
+
 ### 项目结构
 
 ```
@@ -87,11 +107,17 @@ src/
 ├── main/          # 主进程：完整的 Node 环境（代理、配置、用量）
 │   ├── index.js   #   Electron 入口，装配各模块
 │   ├── proxy.js   #   ★ 代理核心，纯 Node，不依赖 Electron，可独立测试
+│   ├── models.js  #   从供应商拉取模型列表（带缓存）
 │   ├── store.js   #   配置读写（原子写入）
 │   ├── usage.js   #   用量记录
 │   └── setup.js   #   首次引导：改写 Claude Code 配置
 ├── preload/       # 安全桥：用 contextBridge 向渲染进程暴露白名单 API
 └── renderer/      # 渲染进程：沙箱化的浏览器环境，只负责 UI
+
+scripts/
+└── ui-smoke.js    # 用 CDP 驱动真实窗口的渲染进程冒烟检查
+
+test/              # node --test 的单元测试（代理、模型拉取、映射解析）
 ```
 
 **架构要点**：代理运行在**主进程**而非渲染进程 —— 渲染进程是沙箱化的浏览器环境，不适合监听端口；主进程才是完整的 Node 运行时。这条边界是理解 Electron 的关键。

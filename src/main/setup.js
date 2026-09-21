@@ -149,9 +149,72 @@ function applyClaudeSettings({ proxyBaseUrl }) {
   return { settingsPath: CLAUDE_SETTINGS, backupPath };
 }
 
+/**
+ * 读出 Claude Code 实际会发出的模型名。
+ *
+ * 这些名字正是「模型映射」左边那一列 —— 让工具把它们读出来，而不是让用户默写，
+ * 是从根上消灭"模型名写错"这类错误（见设计文档 6.5 记录的真实事故）。
+ *
+ * 纯读取，不写入任何内容。读不到时返回 `ok:false` 而不是抛错：
+ * 这只是一个便利功能，不该因为它失败就让用户连供应商都加不了。
+ *
+ * @returns {{ok:boolean, entries?:Array<{name:string, keys:string[]}>, settingsPath:string, reason?:string}}
+ *   entries 按"名字"去重保序；keys 记录这个模型名被哪几个配置键使用，
+ *   因为 Claude Code 常常让主模型、Opus、Sonnet 三个键指向同一个名字。
+ */
+/**
+ * 从 env 对象里抽出模型名。纯函数 —— 摘出来是为了能测试，
+ * 否则测它就得去读用户真实的 ~/.claude/settings.json，既不可控也不该被测试依赖。
+ *
+ * Claude Code 的模型配置项都以 `_MODEL` 结尾：
+ *   ANTHROPIC_MODEL / ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL /
+ *   ANTHROPIC_SMALL_FAST_MODEL / CLAUDE_CODE_SUBAGENT_MODEL
+ *
+ * @returns {Array<{name:string, keys:string[]}>} 按名字去重且保序。
+ *   keys 记录这个模型名被哪几个配置键用到 —— 实践中主模型、Opus、Sonnet
+ *   经常指向同一个名字，把它们合并成一行才不会让用户配三遍。
+ */
+function extractModelNames(env) {
+  const byName = new Map();
+  for (const [key, value] of Object.entries(env || {})) {
+    if (!key.endsWith('_MODEL')) continue;
+    if (typeof value !== 'string') continue;
+    const name = value.trim();
+    if (!name) continue;
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(key);
+  }
+  return [...byName].map(([name, keys]) => ({ name, keys }));
+}
+
+function readClaudeModelNames() {
+  let content;
+  try {
+    const read = readCurrentSettings();
+    if (!read.exists) {
+      return { ok: false, settingsPath: CLAUDE_SETTINGS, reason: '尚未创建 Claude Code 配置文件' };
+    }
+    content = read.content;
+  } catch (err) {
+    return { ok: false, settingsPath: CLAUDE_SETTINGS, reason: err.message };
+  }
+
+  const entries = extractModelNames(content.env);
+  if (entries.length === 0) {
+    return {
+      ok: false,
+      settingsPath: CLAUDE_SETTINGS,
+      reason: '配置里没有以 _MODEL 结尾的项，无法推断 Claude Code 会发出什么模型名',
+    };
+  }
+  return { ok: true, entries, settingsPath: CLAUDE_SETTINGS };
+}
+
 module.exports = {
   previewClaudeSettings,
   applyClaudeSettings,
+  readClaudeModelNames,
+  extractModelNames,
   CLAUDE_SETTINGS,
   PLACEHOLDER_TOKEN,
 };

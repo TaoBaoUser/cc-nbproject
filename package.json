@@ -8,6 +8,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test",
+    "smoke": "node scripts/ui-smoke.js",
     "lint": "eslint .",
     "format": "prettier --write .",
     "postinstall": "node node_modules/electron/install.js"

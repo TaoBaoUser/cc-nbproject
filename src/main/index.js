@@ -15,10 +15,13 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { createStore } = require('./store');
 const { createProxy, testUpstream } = require('./proxy');
 const { createUsageStore } = require('./usage');
-const { previewClaudeSettings, applyClaudeSettings } = require('./setup');
+const { previewClaudeSettings, applyClaudeSettings, readClaudeModelNames } = require('./setup');
+const { createModelFetcher } = require('./models');
 
 const store = createStore();
 const usageStore = createUsageStore();
+// 拉取模型列表可能返回几百 KB（OpenRouter 有 446 个模型），带缓存
+const modelFetcher = createModelFetcher();
 
 let mainWindow = null;
 
@@ -123,6 +126,15 @@ function registerIpcHandlers() {
     baseUrl: proxy.baseUrl,
     activeProfile: store.getActiveProfile(),
   }));
+
+  // --- 模型列表（辅助填写模型映射，见设计文档 6.6）---
+  // 接收的是表单里的**草稿值**而非已保存的 profile id：
+  // 这样新增供应商、还没点保存时也能先拉列表看看有哪些模型可选。
+  ipcMain.handle('models:list', (_event, { baseUrl, apiKey, force }) =>
+    modelFetcher.fetchModels({ baseUrl, apiKey, force })
+  );
+
+  ipcMain.handle('claude:modelNames', () => readClaudeModelNames());
 
   // --- Claude Code 配置引导（破坏性操作：预览与应用严格分离）---
   ipcMain.handle('claude:preview', () =>
