@@ -615,67 +615,105 @@ h1 {
   color: var(--warning);
 }
 
-/* ---------- 模型映射辅助区（拉取模型列表，见设计文档 6.6） ---------- */
-
-.model-helper {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--border);
+/*
+ * 「高级」折叠区。常规用法是到卡片上选模型，手写映射只在边角情况才用得上，
+ * 因此默认收起。
+ *
+ * 用原生 <details>/<summary> 而不是自己写展开逻辑：键盘可达性和屏幕阅读器
+ * 语义是白送的，自己实现一遍只会更容易出错。
+ */
+.advanced {
+  margin-bottom: 15px;
 }
 
-.model-picker {
+.advanced > summary {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.advanced > summary:hover {
+  color: var(--text);
+}
+
+.advanced .field {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+/* ---------- 卡片上的模型选择（见设计文档 6.7） ---------- */
+
+.card-models {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
+  gap: 5px;
+  margin-top: 7px;
 }
 
-/*
- * ⚠️ 这一条不能删，理由和上面 .modal-root[hidden] 完全相同：
- * 上面那条 display: flex 会压掉 hidden 属性依赖的 UA 样式，
- * 结果是选择区永远显示着。同一个坑不踩第二次。
- */
-.model-picker[hidden] {
-  display: none;
-}
-
-.picker-row {
+.card-model-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
-.picker-label {
+.card-model-label {
   flex-shrink: 0;
   width: 68px;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-dim);
 }
 
-.picker-row input {
+/*
+ * 输入框用等宽字体：这里填的是模型 ID（`deepseek/deepseek-v4-pro`），
+ * 比例字体下 `l`、`1`、`I` 难以分辨，而填错一个字符就是 400。
+ */
+.card-model-row input {
   flex: 1;
   min-width: 0;
-  padding: 7px 10px;
+  padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--bg-elevated);
+  border-radius: 6px;
+  background: var(--bg);
   color: var(--text);
-  font: inherit;
-  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
 }
 
-.picker-row input:focus {
+.card-model-row input:focus {
   outline: none;
   border-color: var(--accent);
 }
 
-.picker-actions {
+.card-model-status {
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.card-model-status.is-warn {
+  color: var(--warning);
+}
+
+.card-model-hints {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 一键采纳的猜测值。做成虚线圈而不是实心按钮：它是建议，不是主操作 */
+.model-suggest {
+  padding: 2px 9px;
+  border: 1px dashed var(--accent-dim);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.model-suggest:hover {
+  background: rgba(107, 138, 253, 0.12);
 }
 
 .modal-actions {

@@ -108,17 +108,7 @@ function renderProviderCard(profile) {
   if (isActive) titleChildren.push(el('span', { className: 'badge', text: '使用中' }));
   body.appendChild(el('div', { className: 'card-title' }, titleChildren));
   body.appendChild(el('div', { className: 'card-url', text: profile.baseUrl }));
-
-  // 映射规则是隐式生效的，不显示出来用户很容易忘了自己配过
-  const mapCount = profile.modelMap ? Object.keys(profile.modelMap).length : 0;
-  if (mapCount > 0) {
-    const rules = Object.entries(profile.modelMap)
-      .map(([from, to]) => `${from} → ${to}`)
-      .join('，');
-    body.appendChild(
-      el('div', { className: 'card-note', text: `模型映射 ${mapCount} 条：${rules}` })
-    );
-  }
+  body.appendChild(buildCardModelControls(profile));
 
   const result = describeTestResult(state.testResults.get(profile.id));
   if (result) {
@@ -225,7 +215,9 @@ function closeModal() {
  */
 function describeFetchFailure(result) {
   const reasons = {
-    unsupported: '该供应商没有 /v1/models 接口，请手动填写下方的映射',
+    // 只说事实，不说"请手动填写" —— 卡片上本来就可以直接手打，
+    // 加一句指路的废话反而会让文案变长、重点变模糊
+    unsupported: '该供应商没有 /v1/models 接口',
     auth_failed: '认证失败 —— 请检查 API key',
     network_error: `无法连接 —— ${result.message || '网络错误'}`,
     invalid_url: 'Base URL 不是合法 URL',
@@ -242,142 +234,190 @@ function formatModelMap(modelMap) {
 }
 
 /**
- * 构建「模型映射」下方的辅助区：一个拉取按钮 + 拉取成功后展开的选择区。
+ * Claude Code 实际会发出的模型名。
  *
- * 目标模型用 `<input list>` + `<datalist>` 而不是 `<select>`：OpenRouter 有 446 个模型，
- * 原生下拉框翻起来是灾难；datalist 能边打边筛，且零依赖。
- *
- * 源模型名的候选读自 Claude Code 的 settings.json —— 让用户从**实际会发出的名字**里挑，
- * 而不是默写。这是从根上消灭"模型名写错"的办法（见设计文档 6.5 / 6.6）。
- *
- * 拉取失败不改变任何既有行为：按钮给出原因后，用户照旧手写文本框。
+ * 整页只读一次：它是 `settings.json` 里已经写好的**事实**，不会在运行中变化。
+ * 每张卡片各读一次的话，供应商越多请求越多，而结果完全一样。
  */
-function buildModelHelper({ urlInput, keyInput, modelMapInput, refreshMapStatus }) {
-  const wrap = el('div', { className: 'model-helper' });
+let claudeModelsPromise = null;
+function getClaudeModels() {
+  if (!claudeModelsPromise) {
+    claudeModelsPromise = window.ccnb.getClaudeModelNames().catch(() => ({ ok: false }));
+  }
+  return claudeModelsPromise;
+}
 
-  const fetchBtn = el('button', {
-    className: 'btn btn-ghost btn-sm',
-    text: '从供应商拉取模型列表',
-    attrs: { type: 'button' },
-  });
-  const status = el('div', { className: 'field-status' });
+/**
+ * 卡片上的模型选择区。
+ *
+ * **为什么在卡片上而不是编辑框里**：加一个供应商是"配一次就不动"的事，换模型是
+ * "想换就换"的事。把两件事捆进同一个表单，结果是每换一次模型都要打开编辑框走一遍流程。
+ *
+ * **为什么用 `<input list>` 而不是 `<select>`**：DeepSeek 这类供应商根本没有
+ * `/v1/models` 接口（实测 404），下拉框会是空的，用户就彻底没法填了。
+ * 带 datalist 的文本框既能边打边筛（OpenRouter 有 446 个模型），又永远允许手打。
+ *
+ * **改完立即保存**，没有"保存"按钮：换模型不该比换供应商更麻烦。
+ *
+ * 写进去的是 `profile.modelMap`，与「高级」里手写的映射是同一份数据 ——
+ * 这样代理的改写逻辑一行都不用动（见设计文档 6.7）。
+ */
+function buildCardModelControls(profile) {
+  const wrap = el('div', { className: 'card-models' });
+  // 卡片本身"点击即切换供应商"，这里的控件不能连累整张卡
+  wrap.addEventListener('click', (event) => event.stopPropagation());
 
-  // 拉取成功后才展开
-  const picker = el('div', { className: 'model-picker' });
-  picker.hidden = true;
+  // datalist 的 id 必须每张卡片唯一，否则多张卡片的候选会互相串
+  const listId = `ccnb-models-${profile.id}`;
+  const options = el('datalist', { attrs: { id: listId } });
+  const rows = el('div', { className: 'card-model-rows' });
+  const hints = el('div', { className: 'card-model-hints' });
+  const status = el('div', { className: 'card-model-status' });
 
-  const targetOptions = el('datalist', { attrs: { id: 'ccnb-target-models' } });
-  const sourceOptions = el('datalist', { attrs: { id: 'ccnb-source-models' } });
-
-  const sourceInput = el('input', {
-    attrs: { type: 'text', list: 'ccnb-source-models', placeholder: '源模型名' },
-  });
-  const targetInput = el('input', {
-    attrs: { type: 'text', list: 'ccnb-target-models', placeholder: '目标模型 ID' },
-  });
-  const addBtn = el('button', {
-    className: 'btn btn-sm btn-primary',
-    text: '添加',
-    attrs: { type: 'button' },
-  });
-
-  let availableModels = [];
+  const map = { ...(profile.modelMap || {}) };
+  /** @type {Array<{label: string, name: string, input: HTMLInputElement}>} */
+  const fields = [];
+  let modelIds = [];
+  let fetchStarted = false;
 
   const setStatus = (text, warn = false) => {
-    status.className = warn ? 'field-status is-warn' : 'field-status';
+    status.className = warn ? 'card-model-status is-warn' : 'card-model-status';
     status.textContent = text;
   };
 
-  const applySuggestion = () => {
-    if (availableModels.length === 0) return;
-    const suggestion = suggestModelMapping(
-      sourceInput.value.trim(),
-      availableModels.map((model) => model.id)
-    );
-    // 猜不出来就保持原样，别把用户已经填好的内容清掉
-    if (suggestion) targetInput.value = suggestion;
+  const persist = async () => {
+    try {
+      await window.ccnb.updateProfile(profile.id, { modelMap: map });
+      /*
+       * 落盘之后必须把内存里这份 profile 也同步掉。
+       *
+       * 这一步看着冗余（卡片马上会被重建），但漏掉它会丢数据：
+       * 编辑框是用 `profile.modelMap` 预填「高级」文本框、并在保存时用文本框的
+       * 内容整体覆盖 modelMap 的。内存里那份若还停在旧值，用户就会看到
+       * —— 在卡片上选好了模型 → 打开编辑框，「高级」里空空如也 →
+       * 点「保存」→ 刚选好的映射被空文本整体覆盖掉。
+       *
+       * 冒烟检查的 5b 步就是盯着这条：采纳建议后重开编辑框，「高级」标题
+       * 必须如实显示「已有 N 条」。
+       */
+      profile.modelMap = { ...map };
+    } catch (err) {
+      setStatus(`⚠ 保存失败：${err.message}`, true);
+    }
   };
 
-  // 源模型名的候选来自 Claude Code 的实际配置
-  window.ccnb
-    .getClaudeModelNames()
-    .then((info) => {
-      if (!info || !info.ok) return;
-      for (const entry of info.entries) {
-        sourceOptions.appendChild(
-          el('option', { attrs: { value: entry.name, label: entry.keys.join(' / ') } })
-        );
-      }
-      if (!sourceInput.value) sourceInput.value = info.entries[0].name;
-    })
-    .catch(() => {
-      // 读不到就退化成普通输入框，用户照样能手填
+  const addField = (label, name) => {
+    const input = el('input', {
+      attrs: { type: 'text', list: listId, spellcheck: 'false', placeholder: '原样透传' },
+    });
+    input.value = map[name] || '';
+    input.addEventListener('focus', ensureModels);
+    input.addEventListener('change', async () => {
+      const value = input.value.trim();
+      // 清空就是取消映射。不能留一条空规则 —— 那会让请求带一个空模型名出去
+      if (value) map[name] = value;
+      else delete map[name];
+      await persist();
+      setStatus(value ? '已保存' : '已改回原样透传');
     });
 
-  fetchBtn.addEventListener('click', async () => {
-    const baseUrl = urlInput.value.trim();
-    if (!baseUrl) {
-      setStatus('⚠ 请先填写 Base URL', true);
-      return;
-    }
-    fetchBtn.disabled = true;
-    setStatus('正在拉取…');
+    fields.push({ label, name, input });
+    rows.appendChild(
+      el('div', { className: 'card-model-row' }, [
+        // 标签直接用它对应的 Claude Code 配置键做悬停提示，
+        // 省得用户去猜"主模型"到底对应哪个键
+        el('span', { className: 'card-model-label', text: label, attrs: { title: name } }),
+        input,
+      ])
+    );
+  };
+
+  /**
+   * 拉一次模型列表，填充候选。
+   * 只在第一次聚焦时发起 —— 卡片是每次刷新都重建的，若不这样每张卡都会打一轮请求。
+   */
+  async function ensureModels() {
+    if (fetchStarted) return;
+    fetchStarted = true;
+    setStatus('正在拉取模型列表…');
     try {
-      const result = await window.ccnb.listModels({ baseUrl, apiKey: keyInput.value.trim() });
-      if (result.ok) {
-        availableModels = result.models;
-        targetOptions.replaceChildren();
-        for (const model of result.models) {
-          targetOptions.appendChild(
-            el('option', { attrs: { value: model.id, label: model.name } })
-          );
-        }
-        picker.hidden = false;
-        setStatus(
-          `已拉取 ${result.models.length} 个模型${result.cached ? '（来自缓存）' : ''}，` +
-            '选好后点「添加」写入上方文本框。'
-        );
-        applySuggestion();
-      } else {
-        availableModels = [];
-        picker.hidden = true;
-        setStatus(`⚠ ${describeFetchFailure(result)}`, true);
+      const result = await window.ccnb.listModels({
+        baseUrl: profile.baseUrl,
+        apiKey: profile.apiKey,
+      });
+      if (!result.ok) {
+        setStatus(`${describeFetchFailure(result)}，可直接手打模型 ID`, true);
+        return;
       }
+      modelIds = result.models.map((model) => model.id);
+      options.replaceChildren(
+        ...result.models.map((model) =>
+          el('option', { attrs: { value: model.id, label: model.name } })
+        )
+      );
+      setStatus(`可选 ${modelIds.length} 个模型`);
+      addSuggestions();
     } catch (err) {
       setStatus(`⚠ ${err.message}`, true);
-    } finally {
-      fetchBtn.disabled = false;
     }
-  });
+  }
 
-  sourceInput.addEventListener('input', applySuggestion);
+  /**
+   * 给出可一键采用的猜测值。
+   *
+   * 刻意**不自动填入**：那等于替用户改掉了他正在用的模型，而界面上没有任何提示。
+   * 摆一个可点的建议，采不采纳由用户决定 —— 少一次点击不值得用"悄悄改配置"来换。
+   */
+  const addSuggestions = () => {
+    for (const field of fields) {
+      if (field.input.value.trim()) continue; // 用户已经选好了就别插手
+      const guess = suggestModelMapping(field.name, modelIds);
+      if (!guess) continue;
 
-  addBtn.addEventListener('click', () => {
-    const source = sourceInput.value.trim();
-    const target = targetInput.value.trim();
-    if (!source || !target) {
-      setStatus('⚠ 源模型名和目标模型都要填', true);
+      const chip = el('button', {
+        className: 'model-suggest',
+        text: `${field.label}：建议 ${guess}`,
+        attrs: { type: 'button' },
+      });
+      chip.addEventListener('click', async () => {
+        field.input.value = guess;
+        map[field.name] = guess;
+        await persist();
+        chip.remove();
+        setStatus('已保存');
+      });
+      hints.appendChild(chip);
+    }
+  };
+
+  // 源模型名读自 Claude Code 的配置：Claude Code 会发什么名字是**事实**，
+  // 不该让用户去挑一个"源"（见设计文档 6.7）
+  getClaudeModels().then((info) => {
+    const pairs = [];
+    if (info && info.ok) {
+      if (info.main) pairs.push(['主模型', info.main]);
+      if (info.fast) pairs.push(['后台小任务', info.fast]);
+    }
+    if (pairs.length === 0) {
+      setStatus('读不到 Claude Code 的模型名，请到「编辑 → 高级」手动填写映射', true);
       return;
     }
-    modelMapInput.value = upsertModelMapLine(modelMapInput.value, source, target);
-    refreshMapStatus();
-    targetInput.value = '';
-    setStatus(`已写入：${source} → ${target}`);
+    for (const [label, name] of pairs) addField(label, name);
+
+    // 「高级」里手写的、这两个下拉覆盖不到的规则，必须让用户知道它们还在生效
+    const managed = new Set(fields.map((f) => f.name));
+    const extras = Object.keys(map).filter((key) => !managed.has(key));
+    if (extras.length > 0) {
+      wrap.appendChild(
+        el('div', {
+          className: 'card-note',
+          text: `另有 ${extras.length} 条手动规则：${extras.join('，')}`,
+        })
+      );
+    }
   });
 
-  picker.append(
-    el('div', { className: 'picker-row' }, [
-      el('span', { className: 'picker-label', text: '源模型名' }),
-      sourceInput,
-    ]),
-    el('div', { className: 'picker-row' }, [
-      el('span', { className: 'picker-label', text: '目标模型' }),
-      targetInput,
-    ]),
-    el('div', { className: 'picker-actions' }, [addBtn])
-  );
-
-  wrap.append(fetchBtn, status, sourceOptions, targetOptions, picker);
+  wrap.append(options, rows, hints, status);
   return wrap;
 }
 
@@ -392,7 +432,9 @@ function openProfileModal(profile = null) {
   modal.appendChild(
     el('p', {
       className: 'modal-sub',
-      text: isEdit ? '修改后立即生效，无需重启' : '填入 Anthropic 兼容端点的地址与凭证',
+      text: isEdit
+        ? '修改后立即生效，无需重启。模型在卡片上直接选'
+        : '填入 Anthropic 兼容端点的地址与凭证，模型稍后在卡片上选',
     })
   );
 
@@ -459,15 +501,25 @@ function openProfileModal(profile = null) {
   modal.appendChild(
     field('API Key', keyInput, '仅保存在本机 ~/.cc-nbproject/，文件权限 600，不会进入任何版本库')
   );
+  // 映射收进「高级」：常规用法是到卡片上选模型（见设计文档 6.7），
+  // 只有下拉覆盖不到的边角情况才需要手写规则
   const mapField = field(
-    '模型映射（可选）',
+    '模型映射',
     modelMapInput,
     'Claude Code 发出的模型名在不同供应商那里叫法不同。每行一条「源=目标」，' +
       '未命中的模型名将原样转发。留空则不启用映射。'
   );
   mapField.appendChild(mapStatus);
-  mapField.appendChild(buildModelHelper({ urlInput, keyInput, modelMapInput, refreshMapStatus }));
-  modal.appendChild(mapField);
+
+  const advanced = el('details', { className: 'advanced' });
+  const mapCount = profile && profile.modelMap ? Object.keys(profile.modelMap).length : 0;
+  advanced.appendChild(
+    el('summary', {
+      text: mapCount > 0 ? `高级：手动映射规则（已有 ${mapCount} 条）` : '高级：手动映射规则',
+    })
+  );
+  advanced.appendChild(mapField);
+  modal.appendChild(advanced);
 
   const errorText = el('div', { className: 'error-text' });
   modal.appendChild(errorText);

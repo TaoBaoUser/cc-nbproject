@@ -118,44 +118,11 @@ function suggestModelMapping(sourceName, modelIds) {
   return best ? best.id : null;
 }
 
-/**
- * 在映射文本里新增或替换一条规则，返回新的文本。
- *
- * 逐行处理而不是"解析成对象再重新序列化"，是为了**保住用户写的注释和空行** ——
- * 后者会让用户在界面上做的任何一次小修改，都把他精心写的注释抹掉。
- *
- * 源名已存在时原地替换那一行（而不是追加），否则同一条规则会出现两次，
- * 后一条静默覆盖前一条，而在文本框里根本看不出来。
- */
-function upsertModelMapLine(text, source, target) {
-  // 先去掉末尾空白，空输入直接当作"没有行"，
-  // 免得追加时在最前面留下一个空行
-  const trimmed = String(text || '')
-    .replace(/\\n/g, '\n')
-    .replace(/\s+$/, '');
-  const lines = trimmed === '' ? [] : trimmed.split('\n');
-
-  let replaced = false;
-  const next = lines.map((line) => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) return line;
-    const separator = trimmed.indexOf('=');
-    if (separator === -1) return line;
-    if (trimmed.slice(0, separator).trim() !== source) return line;
-    replaced = true;
-    return `${source}=${target}`;
-  });
-
-  if (!replaced) next.push(`${source}=${target}`);
-  return next.join('\n');
-}
-
 // 浏览器里没有 module；Node 里才有。守卫住，让同一个文件两边都能用。
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     parseModelMap,
     findModelMapProblems,
     suggestModelMapping,
-    upsertModelMapLine,
   };
 }

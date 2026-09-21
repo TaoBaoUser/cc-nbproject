@@ -81,7 +81,6 @@ module.exports = [
         parseModelMap: 'readonly',
         findModelMapProblems: 'readonly',
         suggestModelMapping: 'readonly',
-        upsertModelMapLine: 'readonly',
       },
     },
   },

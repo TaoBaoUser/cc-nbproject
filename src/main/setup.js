@@ -174,6 +174,16 @@ function applyClaudeSettings({ proxyBaseUrl }) {
  *   keys 记录这个模型名被哪几个配置键用到 —— 实践中主模型、Opus、Sonnet
  *   经常指向同一个名字，把它们合并成一行才不会让用户配三遍。
  */
+/**
+ * 归属"后台小任务"的配置键。用来把模型名分成主模型 / 小任务两类，
+ * 依据是键的语义而不是用户起的名字。
+ */
+const FAST_MODEL_KEYS = new Set([
+  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_SMALL_FAST_MODEL',
+  'CLAUDE_CODE_SUBAGENT_MODEL',
+]);
+
 function extractModelNames(env) {
   const byName = new Map();
   for (const [key, value] of Object.entries(env || {})) {
@@ -207,7 +217,46 @@ function readClaudeModelNames() {
       reason: '配置里没有以 _MODEL 结尾的项，无法推断 Claude Code 会发出什么模型名',
     };
   }
-  return { ok: true, entries, settingsPath: CLAUDE_SETTINGS };
+  const { main, fast } = classifyModelNames(entries);
+  return { ok: true, entries, main, fast, settingsPath: CLAUDE_SETTINGS };
+}
+
+/**
+ * 判定哪个模型名是"主模型"、哪个是"后台小任务模型"。
+ *
+ * 依据是配置键而不是名字本身 —— 名字是用户随便起的，键是 Claude Code 定义的语义。
+ * 一次会话里 Claude Code 会同时发这两种请求：主模型负责对话，小任务模型负责
+ * 生成标题、压缩上下文这类轻量活儿。把它们指到不同价位，才有省钱的可能。
+ *
+ * 纯函数，可测。
+ *
+ * @returns {{main: string|null, fast: string|null}} 找不到对应项时为 null
+ */
+function classifyModelNames(entries) {
+  let main = null;
+  let mainHits = 0;
+  let fast = null;
+  let fastHits = 0;
+
+  for (const entry of entries || []) {
+    if (!entry || !Array.isArray(entry.keys)) continue;
+    const hits = entry.keys.filter((key) => FAST_MODEL_KEYS.has(key)).length;
+    // 不属于小任务那几项的都算主模型侧的键
+    const mainSide = entry.keys.length - hits;
+
+    if (mainSide > mainHits) {
+      mainHits = mainSide;
+      main = entry.name;
+    }
+    if (hits > fastHits) {
+      fastHits = hits;
+      fast = entry.name;
+    }
+  }
+
+  // 两种请求指向同一个模型名时只留一个，否则卡片上会出现两个下拉选同一个值
+  if (main === fast) fast = null;
+  return { main, fast };
 }
 
 module.exports = {
@@ -215,6 +264,7 @@ module.exports = {
   applyClaudeSettings,
   readClaudeModelNames,
   extractModelNames,
+  classifyModelNames,
   CLAUDE_SETTINGS,
   PLACEHOLDER_TOKEN,
 };
