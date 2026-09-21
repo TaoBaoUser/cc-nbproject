@@ -97,6 +97,11 @@ npm run smoke            # 默认挑名字含 openrouter 的 profile
 npm run smoke -- <名字片段>
 ```
 
+**它不会动你已有的供应商。** 第二个参数只用来抄 `baseUrl`/`apiKey` —— 检查全程
+操作的是一个当场新建的一次性供应商 `__smoke__`，结束时无条件删掉，并逐字段核对
+你原有的配置一字未变。（早先的版本直接在真实 profile 上改、收尾再还原，
+结果把用户运行期间自己改的值覆盖掉了；检查工具不该有这种窗口期。）
+
 零依赖 —— 用 Chrome DevTools Protocol 直接驱动，Node 自带的 `fetch` / `WebSocket` 就够，
 不引入 puppeteer。详见[设计文档 9.1](docs/plans/2026-09-21-cc-nbproject-design.md)。
 
