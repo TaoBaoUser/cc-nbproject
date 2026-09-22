@@ -9,11 +9,15 @@
     "start": "electron .",
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
-    "test": "node --test",
-    "e2e": "node scripts/takeover-e2e.js",
-    "smoke": "node scripts/ui-smoke.js",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --test",
+    "coverage": "node --test --experimental-test-coverage",
+    "verify": "npm run typecheck && npm run lint && npm test",
+    "e2e": "node scripts/e2e/run.js",
+    "smoke": "node scripts/smoke.js",
     "postinstall": "node node_modules/electron/install.js"
   },
   "keywords": [

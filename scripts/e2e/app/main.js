@@ -2,7 +2,7 @@
 
 /**
  * 端到端检查专用的 Electron 入口。**这不是生产代码**，只被
- * `scripts/takeover-e2e.js` 用 `npx electron scripts/e2e-app` 启动。
+ * `scripts/e2e/run.js` 用 `npx electron scripts/e2e/app` 启动。
  *
  * 它只做两件事：
  *
@@ -24,7 +24,7 @@
  * userData 落在隔离目录里，单实例锁与用户正在运行的那个应用**互不干扰**。
  */
 
-require('../../src/main/index.js');
+require('../../../src/main/index.js');
 
 const fs = require('fs');
 const { app } = require('electron');

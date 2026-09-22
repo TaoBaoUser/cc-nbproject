@@ -21,7 +21,7 @@
  * 用法：
  *   1. 另开一个终端启动带调试端口的应用
  *        npx electron . --remote-debugging-port=9222
- *   2. node scripts/ui-smoke.js [profile 名的一部分]
+ *   2. node scripts/smoke.js [profile 名的一部分]
  *      第二个参数默认 `openrouter`，只用来**抄取 baseUrl 与 apiKey** ——
  *      拉取候选那几步需要一个真能连通的端点，端点行为不同的供应商会走不同分支。
  *
@@ -437,8 +437,9 @@ async function main() {
     // --- 6b. 边打边筛 + 键盘选中 ---
     // 换掉原生 datalist 的全部理由就在这两件事上：能不能筛、能不能用键盘选。
     // 446 个候选里靠肉眼找 `deepseek/deepseek-v4-flash` 是不现实的。
-    const typed = fetched.候选数 > 0
-      ? await evaluate(`
+    const typed =
+      fetched.候选数 > 0
+        ? await evaluate(`
       ${findCard(SMOKE_NAME)}
       const input = card.querySelector('.card-model-row input');
       // 先聚焦把候选拉出来（结果有缓存，这一步很快），否则这里数到的 0
@@ -460,14 +461,17 @@ async function main() {
         首个候选: options[0]?.dataset.value ?? null,
       };
     `)
-      // 拉候选要走网络，端点不通时不该把渲染进程的检查一并判失败
-      : { 跳过: '没拉到候选（端点不通），无法检查筛选与键盘选择' };
+        : // 拉候选要走网络，端点不通时不该把渲染进程的检查一并判失败
+          { 跳过: '没拉到候选（端点不通），无法检查筛选与键盘选择' };
     report('输入关键词筛选候选', typed);
     expect(
       typed.跳过 || typed.打字前候选数 > 0,
       '聚焦后候选列表应有内容（字段已有值时已是按当前值筛过的结果），实际 ' + typed.打字前候选数
     );
-    expect(typed.跳过 || typed.筛选后候选数 > 0, '输入 flash 后应该还有候选（该端点有 flash 系列模型）');
+    expect(
+      typed.跳过 || typed.筛选后候选数 > 0,
+      '输入 flash 后应该还有候选（该端点有 flash 系列模型）'
+    );
     expect(
       typed.跳过 || (typed.全部命中关键词 && typed.筛选后候选数 < fetched.候选数),
       `候选应按关键词收窄，实际 ${typed.筛选后候选数} / ${fetched.候选数} 条，命中=${typed.全部命中关键词}`
@@ -772,10 +776,7 @@ async function main() {
       `状态行与文件内容不一致：界面显示「${claudeRow.界面}」（${claudeRow.界面文案}），` +
         `按文件内容应为「${期望界面}」`
     );
-    expect(
-      claudeRow.主进程state === claudeRow.界面,
-      '侧边栏渲染的状态与主进程给的状态不一致'
-    );
+    expect(claudeRow.主进程state === claudeRow.界面, '侧边栏渲染的状态与主进程给的状态不一致');
   } catch (err) {
     // 不在这里抛：先把一次性供应商清理干净，再统一汇报问题
     fatal = err;

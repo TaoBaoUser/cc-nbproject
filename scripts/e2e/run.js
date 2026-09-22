@@ -8,19 +8,19 @@
  *
  *   - `npx tsc --noEmit` / `npm run lint` / `npm test` 全绿，证明不了渲染进程能渲染、
  *     也证明不了生命周期钩子在真的 Electron 里会触发。本项目已经吃过两次
- *     「代码一跑就崩、lint 却全绿」的亏（见 scripts/ui-smoke.js 的文件头）。
+ *     「代码一跑就崩、lint 却全绿」的亏（见 scripts/smoke.js 的文件头）。
  *   - 本项工作最关键的一条断言 —— 「退出时自动还原」—— 挂在 `before-quit` 上。
  *     而 `before-quit` 到底会不会在 `app.quit()` 路径上触发、`preventDefault()`
  *     之后 `app.exit(0)` 会不会形成退出死循环，**只有真起一个 Electron 才知道**。
  *
- * 与 ui-smoke.js 的分工：那个脚本驱动**用户正在使用的那份配置**，因此只碰一个
+ * 与 smoke.js 的分工：那个脚本驱动**用户正在使用的那份配置**，因此只碰一个
  * 一次性供应商；这个脚本从头到尾跑在 `mkdtemp` 造出的隔离 HOME 里，
  * **完全不接触用户真实的 `~/.claude/settings.json` 与 `~/.cc-nbproject/`**。
  *
- * 零依赖：Node 全局 fetch + 全局 WebSocket 直接讲 CDP（与 ui-smoke.js 同一套办法）。
+ * 零依赖：Node 全局 fetch + 全局 WebSocket 直接讲 CDP（与 scripts/smoke.js 同一套办法）。
  *
  * 用法：
- *   node scripts/takeover-e2e.js
+ *   node scripts/e2e/run.js
  * 退出码 0 表示全部场景通过。
  */
 
@@ -29,9 +29,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const PROJECT_ROOT = path.join(__dirname, '..');
+// __dirname 是 scripts/e2e，因此要退两层才回到仓库根。
+const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const CDP_PORT = Number(process.env.CDP_PORT || 9223);
-const APP_DIR = 'scripts/e2e-app';
+// 相对 CWD（仓库根）传入 —— spawn 时作为 Electron 的应用目录。
+const APP_DIR = 'scripts/e2e/app';
 
 /** 本次「安装」的本地准入凭证。预置进 profiles.json，好断言写进 Claude Code 的是它。 */
 const LOCAL_TOKEN = 'a'.repeat(64);
@@ -353,10 +355,7 @@ async function scenarioMainFlow(home) {
     `);
 
     expect(modal?.标题 === '接管 Claude Code', `弹窗标题正确（实际 ${modal?.标题}）`);
-    expect(
-      modal?.正文?.includes('一次性授权'),
-      '弹窗说明了「一次授权、之后自动」的语义'
-    );
+    expect(modal?.正文?.includes('一次性授权'), '弹窗说明了「一次授权、之后自动」的语义');
     expect(
       modal?.正文?.includes('不再打算打开本应用') && modal?.正文?.includes('断开接入'),
       '弹窗给出了「以后不打算再打开本应用就先断开」的告警'
@@ -395,9 +394,7 @@ async function scenarioMainFlow(home) {
     const state1 = await client.evaluate(`return ${takeStateExpr};`);
     expect(state1 === 'active', `侧边栏切到「已接管」（实际 ${state1}）`);
 
-    const baseUrl = await client.evaluate(
-      `return (await window.ccnb.getProxyStatus()).baseUrl;`
-    );
+    const baseUrl = await client.evaluate(`return (await window.ccnb.getProxyStatus()).baseUrl;`);
     note(`本次代理实听地址：${baseUrl}`);
     if (baseUrl !== 'http://127.0.0.1:8787') {
       note('8787 被占用、代理已漂移 —— 写进配置的必须是实听地址，这正是要验的分支');
@@ -430,13 +427,8 @@ async function scenarioMainFlow(home) {
     const baks = backups(home);
     expect(baks.length === 1, `恰好产生一个备份（实际 ${baks.length} 个）`);
     if (baks.length === 1) {
-      const bak = JSON.parse(
-        fs.readFileSync(path.join(home, '.claude', baks[0]), 'utf8')
-      );
-      expect(
-        JSON.stringify(bak) === JSON.stringify(USER_SETTINGS),
-        '备份内容是接入前的原文'
-      );
+      const bak = JSON.parse(fs.readFileSync(path.join(home, '.claude', baks[0]), 'utf8'));
+      expect(JSON.stringify(bak) === JSON.stringify(USER_SETTINGS), '备份内容是接入前的原文');
     }
     expect(
       (fs.statSync(claudeSettingsPath(home)).mode & 0o777) === 0o600,
@@ -450,10 +442,7 @@ async function scenarioMainFlow(home) {
       state?.previous?.ANTHROPIC_BASE_URL === 'https://api.deepseek.com/anthropic',
       '记下的 previous 是用户原值'
     );
-    expect(
-      state?.backupPath && path.isAbsolute(state.backupPath),
-      '记下了备份文件的绝对路径'
-    );
+    expect(state?.backupPath && path.isAbsolute(state.backupPath), '记下了备份文件的绝对路径');
   });
 
   // ---- 退出之后：文件必须回到原样 ----
@@ -467,15 +456,9 @@ async function scenarioMainFlow(home) {
     restored.env.ANTHROPIC_AUTH_TOKEN === 'sk-real-user-key',
     '退出后 ANTHROPIC_AUTH_TOKEN 已还原成用户真实 key'
   );
-  expect(
-    restored.env.ANTHROPIC_MODEL === 'deepseek-v4-pro',
-    '退出后模型相关配置仍然原样'
-  );
+  expect(restored.env.ANTHROPIC_MODEL === 'deepseek-v4-pro', '退出后模型相关配置仍然原样');
   expect(backups(home).length === 1, '退出还原没有再产生备份');
-  expect(
-    readTakeoverState(home)?.lastRestore?.ok === true,
-    'profiles.json 里记下了还原成功'
-  );
+  expect(readTakeoverState(home)?.lastRestore?.ok === true, 'profiles.json 里记下了还原成功');
 }
 
 async function scenarioAutoTakeover(home) {
@@ -486,10 +469,7 @@ async function scenarioAutoTakeover(home) {
     expect(state === 'active', `无需任何点击即处于「已接管」（实际 ${state}）`);
 
     const after = readSettings(home);
-    expect(
-      after.env.ANTHROPIC_BASE_URL?.startsWith('http://127.0.0.1:'),
-      '文件又被指回本机代理'
-    );
+    expect(after.env.ANTHROPIC_BASE_URL?.startsWith('http://127.0.0.1:'), '文件又被指回本机代理');
   });
 
   const restored = readSettings(home);

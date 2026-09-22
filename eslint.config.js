@@ -31,7 +31,7 @@ const nodeGlobals = {
   TextDecoder: 'readonly',
   TextEncoder: 'readonly',
   fetch: 'readonly',
-  // Node 22 起是全局变量。scripts/ui-smoke.js 用它走 CDP 驱动真实窗口，
+  // Node 22 起是全局变量。scripts/smoke.js 用它走 CDP 驱动真实窗口，
   // 从而不必为了做 UI 冒烟检查而引入 puppeteer。
   WebSocket: 'readonly',
 };
