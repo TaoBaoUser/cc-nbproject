@@ -291,14 +291,36 @@ function createProxy({
     const startedAt = Date.now();
 
     // 准入校验。见 holdsLocalToken 与 store.js 的 getLocalToken。
-    const localToken = typeof getLocalToken === 'function' ? getLocalToken() : null;
+    //
+    // getLocalToken() 会读 profiles.json，因此**必须假设它会抛** —— 与下面几行的
+    // getActiveProfile() 是同一类风险。这一处曾经漏掉过：用户手工把那个文件
+    // 编辑坏（或磁盘写了一版半截文件）之后，异常会穿透 http 请求监听器，
+    // 整个应用连同正在跑的代理一起消失，而对面只看到连接被重置。
+    //
+    // 抛错时**拒绝服务，而不是降级为「不校验」**。后者不是容错而是漏洞：
+    // 代理会拿用户的真实 key 转发任何来客的请求，于是「把 profiles.json 弄坏」
+    // 就成了同机任意进程绕过准入校验的办法。宁可回一条可读的 500。
+    let localToken = null;
+    try {
+      localToken = typeof getLocalToken === 'function' ? getLocalToken() : null;
+    } catch (err) {
+      onRequest({ phase: 'error', error: err.message, profileName: null });
+      sendJson(clientRes, 500, {
+        type: 'error',
+        error: {
+          type: 'config_unreadable',
+          message: `读取本地准入凭证失败：${err.message}`,
+        },
+      });
+      return;
+    }
+
     if (localToken && !holdsLocalToken(clientReq, localToken)) {
       sendJson(clientRes, 401, {
         type: 'error',
         error: {
           type: 'unauthorized',
-          message:
-            '缺少或不匹配的本地准入凭证。本代理只服务于被 cc-nbproject 接管的 Claude Code。',
+          message: '缺少或不匹配的本地准入凭证。本代理只服务于被 cc-nbproject 接管的 Claude Code。',
         },
       });
       return;
@@ -815,7 +837,8 @@ function pickConclusion({ failures, tried, durationMs }) {
   const allSameKind = failures.every((f) => f.kind === failures[0].kind);
   const picked = allSameKind
     ? failures[0]
-    : CONCLUSION_PRIORITY.map((k) => failures.find((f) => f.kind === k)).find(Boolean) || failures[0];
+    : CONCLUSION_PRIORITY.map((k) => failures.find((f) => f.kind === k)).find(Boolean) ||
+      failures[0];
 
   return {
     ok: false,

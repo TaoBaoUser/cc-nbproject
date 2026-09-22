@@ -831,6 +831,40 @@ test('准入：未配置凭证时不校验（测试与旧行为兼容）', async
   assert.equal(result.status, 200);
 });
 
+test('准入：读不出凭证时回 500 拒绝，绝不降级成「跳过校验」', async (t) => {
+  let upstreamHits = 0;
+  const upstream = await startServer((req, res) => {
+    upstreamHits += 1;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"content":[]}');
+  });
+
+  const proxy = createProxy({
+    getActiveProfile: () => profileFor(upstream.baseUrl),
+    // 模拟 profiles.json 损坏：store.getLocalToken() 内部会 load() 并抛错
+    getLocalToken: () => {
+      throw new Error('profiles.json 不是合法 JSON');
+    },
+    port: 0,
+  });
+  const proxyPort = await proxy.start();
+  t.after(async () => {
+    await proxy.stop();
+    await stopServer(upstream.server);
+  });
+
+  const result = await requestThroughProxy(`http://127.0.0.1:${proxyPort}`, {
+    headers: { authorization: `Bearer ${LOCAL_TOKEN}` },
+  });
+
+  assert.equal(result.status, 500);
+  assert.match(result.body, /config_unreadable/);
+  // 要害在这一条：不能因为「读不出凭证」就当成「没有凭证要校验」。
+  // 那会把「弄坏 profiles.json」变成绕过准入的办法 —— 同机任何进程只要让用户的
+  // 配置文件读不出来，就能借代理白用他的真实 key 并计费。
+  assert.equal(upstreamHits, 0);
+});
+
 // ---------------------------------------------------------------------------
 // 9. 生命周期：起不来要能重试，关得掉要有时限
 // ---------------------------------------------------------------------------
