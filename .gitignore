@@ -26,6 +26,13 @@ credentials/
 .idea/
 *.swp
 
+# --- 本地工具配置 ---
+# Claude Code 的本地权限白名单。它记录的是「这台机器上放行过哪些命令」，
+# 属于个人环境而不属于这个项目 —— 提交上去只会给协作者制造无谓冲突。
+# 作者机器的全局 gitignore 恰好覆盖了它，但别人克隆时不会继承那份配置，
+# 所以仓库自己要有一条。
+.claude/settings.local.json
+
 # --- 日志 ---
 *.log
 npm-debug.log*

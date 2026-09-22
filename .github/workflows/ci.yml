@@ -1,0 +1,99 @@
+# 持续集成。
+#
+# 这个仓库有一套三级验证策略（见 docs/工程约束.md 第 5 节），但在这份工作流出现
+# 之前，**三级全靠人记得手动跑**。CI 把它们变成合并前的硬门槛。
+#
+# 三级里只有前两级能自动化：
+#
+#   第 1 级  tsc + lint + 单测        → job: check（ubuntu，快）
+#   第 2 级  真 Electron 端到端        → job: e2e（macOS，慢）
+#   第 3 级  真实窗口冒烟 smoke.js     → **不进 CI，且永远不要进**
+#
+# 第 3 级为什么排除在外：smoke.js 连的是**用户正在运行的那个实例**，还要从
+# 用户已有的供应商里抄 baseUrl 与 apiKey 去建一次性供应商。CI 里既没有「用户
+# 正在运行的应用」，也没有真实凭证。它的定位就是开发者本机的交互式检查。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支连续推送时，取消上一次还没跑完的运行 —— 排队等一个已经过时的提交没有意义。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: 静态检查与单元测试
+    runs-on: ubuntu-latest
+    # 备注：这里原本想用 ELECTRON_SKIP_BINARY_DOWNLOAD=1 跳过 Electron 二进制下载
+    # （这个 job 并不启动 Electron），但 electron@44 的 install.js **不识别这个变量** ——
+    # 实测 `grep -r ELECTRON_SKIP_BINARY_DOWNLOAD node_modules/electron` 无任何引用，
+    # 而且该包的 `scripts` 是空对象（二进制是本仓库自己的 postinstall 下载的）。
+    # 写上去只省不到时间，却会让人以为优化过了。宁可不优化，也不留一条说谎的注释。
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      # 以下四步与 docs/工程约束.md 第 5 节的「第 1 级」一一对应，顺序也一致。
+      # 本地一键跑完前三条：npm run verify
+      - name: 类型检查（渲染进程 + 主进程）
+        run: npm run typecheck
+
+      - name: 代码规范
+        run: npm run lint
+
+      - name: 单元测试
+        run: npm test
+
+      - name: 构建渲染进程
+        # 单独跑一次 build：`npm ci` 不产出 dist/，而它是 npm start 与 e2e 的前提。
+        # 构建失败必须在这里就暴露，而不是等打包时才发现。
+        run: npm run build
+
+  e2e:
+    name: 真 Electron 端到端（接管 → 退出 → 还原）
+    # 必须是 macOS：这一级验的是 `before-quit` 在真实退出路径上会不会触发、
+    # `app.exit(0)` 会不会形成退出死循环 —— 那是 Electron 在 macOS 上的退出语义。
+    #
+    # ⚠️ 只在 PR 上跑，不在每次 push 到 main 时跑。**这是额度考虑，不是取舍**：
+    # 本仓库是私有仓库，而 GitHub Actions 的 macOS runner 按 **10 倍** 计入额度
+    # （免费额度 2000 分钟/月）。每次 e2e 约烧 20–40 分钟额度，push 触发会让额度
+    # 成倍消耗。PR 是真正的合并门槛，把这一级放在那里收益最高、浪费最少。
+    # 直接 push 到 main 的改动，请在本地跑 `npm run e2e`。
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建渲染进程
+        # e2e 启动的是生产入口（scripts/e2e/app/main.js → src/main/index.js），
+        # 没有 VITE_DEV_SERVER_URL，因此它加载的是 dist/renderer/index.html。
+        # 少了这一步，验证会在「界面白屏」上失败。
+        run: npm run build
+
+      - name: 端到端检查
+        # 全程跑在 mkdtemp 造出的隔离 HOME 上，不接触任何真实用户配置。
+        run: npm run e2e

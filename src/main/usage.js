@@ -1,3 +1,4 @@
+// @ts-check
 'use strict';
 
 /**
@@ -26,6 +27,27 @@ const FILE_MODE = 0o600;
  */
 const MAX_READ_LINES = 50000;
 
+/**
+ * 一条用量记录。
+ *
+ * 字段全部可选 —— 流式响应被用户中途打断时拿不到完整的 `usage`，
+ * 但那条请求确实发生过、确实消耗了额度，仍然要记账（见 `summarize` 的说明）。
+ * 因此这里描述的是「可能出现的字段」，而不是「必然存在的字段」。
+ *
+ * 形状与 `src/renderer/types.ts` 的 `LogEvent`（`kind: 'usage'` 那一支）对应，
+ * 改动时两处要一起改。
+ *
+ * @typedef {object} UsageRecord
+ * @property {string} [ts]           ISO 8601 时间戳
+ * @property {string} [profileId]    这次请求走了哪个供应商
+ * @property {string} [profileName]  供应商名字的快照（供应商之后可能被删）
+ * @property {string} [model]        实际使用的模型
+ * @property {number} [durationMs]
+ * @property {number} [inputTokens]
+ * @property {number} [outputTokens]
+ * @property {number} [status]       HTTP 状态码
+ */
+
 function createUsageStore({ dir = DEFAULT_DIR } = {}) {
   const usageFile = path.join(dir, 'usage.jsonl');
 
@@ -35,6 +57,7 @@ function createUsageStore({ dir = DEFAULT_DIR } = {}) {
     }
   }
 
+  /** @param {UsageRecord} record */
   function append(record) {
     ensureDir();
     // 追加写是原子性足够的：单次 appendFileSync 在大多数文件系统上

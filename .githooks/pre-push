@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# 推送前的本地门禁。
+#
+# 为什么要有它：CI 已经能挡住不合格的提交，但**它在你推送之后才跑** ——
+# 等 CI 变红再回头改，一个来回就没了。这个钩子把同样的检查提前到推送前，
+# 三秒内就知道行不行。
+#
+# 为什么是 pre-push 而不是 pre-commit：提交应当允许是「半成品」，
+# 而推送意味着「要让别人看见了」。检查放在后者上，既不打断频繁提交的节奏，
+# 又保证推出去的东西是绿的。
+#
+# 为什么不用 husky / lint-staged：本项目的依赖策略是「能不加就不加」
+# （见 docs/工程约束.md 第 7 节），而这里要的只是「跑一条命令」，十几行 shell 就够。
+# 何况 postinstall 每多一个依赖，就多一处安装失败的来源 ——
+# 本项目已经因为 postinstall 装 Electron 二进制吃过网络的亏。
+#
+# ---- 启用（只需一次）----
+#     git config core.hooksPath .githooks
+#     chmod +x .githooks/pre-push
+#
+# ---- 确实需要跳过时 ----
+#     git push --no-verify
+
+# 第 1 级验证：类型 + 规范 + 单元测试（约 3 秒）。
+# 第 2 级（npm run e2e，真 Electron）太慢，不适合放在推送前，交给 CI。
+npm run verify || {
+  echo ""
+  echo "✗ 验证未通过，已阻止推送。"
+  echo "  修完后重试；确实需要跳过时用 git push --no-verify。"
+  exit 1
+}

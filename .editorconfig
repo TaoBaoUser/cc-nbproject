@@ -1,0 +1,26 @@
+# 编辑器基础约定。
+#
+# 与 .prettierrc 的分工：Prettier 管「格式化后长什么样」，这里管「编辑器在你敲下
+# 回车的那一刻做什么」。两者结论必须一致，否则会出现「编辑器写的」与「prettier 跑的」
+# 来回打架 —— 所以下面的缩进/换行/行尾与 .prettierrc 保持同一套结论。
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+# Markdown 里行尾两个空格是**有语义的换行**，不能当成脏字符删掉。
+# 本仓库的文档大量使用「行尾两空格」控制段落内换行。
+trim_trailing_whitespace = false
+
+[*.{json,jsonc}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab

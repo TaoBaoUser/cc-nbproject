@@ -1,0 +1,64 @@
+/*
+ * 主进程与工具脚本的类型检查配置。
+ *
+ * ## 为什么需要单独一份
+ *
+ * 根目录的 `tsconfig.json` 只 `include: ["src/renderer"]` —— 也就是说，
+ * **`src/main/` 那六个模块、`src/preload/`、以及 `scripts/` 与 `test/` 全都不在
+ * 类型检查范围内**。而那恰恰是本仓库最不能出错的部分：`setup.js` 写错会改坏用户的
+ * `~/.claude/settings.json`，`proxy.js` 写错会静默用错凭证。
+ *
+ * 这六个模块加起来约 6000 行 JS，此前只有 ESLint 的基础规则（no-undef、eqeqeq）
+ * 盯着，而 ESLint 不看类型 —— 本项目已经因此吃过「少传一个参数，一跑就崩、
+ * lint 全绿」的亏。
+ *
+ * ## 为什么要用 checkJs: false + 逐文件 @ts-check
+ *
+ * 在 `checkJs: true` 下，这六个模块当前有 210 个错误，其中 178 个是「隐式 any」
+ * （给参数补 JSDoc 类型注解即可）。一次性全开会让 CI 从第一天起就是红的，
+ * 也就没人会去看它。
+ *
+ * 所以这里采取**渐进式**：默认不检查 `.js`，但在某个文件顶部写一行
+ *
+ *     // @ts-check
+ *
+ * 就单独把它纳入检查。想推进哪个模块，就给它加这一行、把该文件的错误清零。
+ * 这样做的好处是每一步都是绿的，覆盖范围只增不减。
+ *
+ * ## 怎么用
+ *
+ *     npx tsc -p tsconfig.main.json       # 检查已纳入的文件
+ *
+ * `npm run typecheck` 会同时跑这两份配置。
+ */
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "types": ["node"],
+
+    "allowJs": true,
+    "checkJs": false,
+
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // 主进程不允许用异步 API 却不处理返回值，也不允许 switch 漏分支。
+    // 这两条在渲染进程那份配置里没开（React 生态里噪音较大），但在主进程值得。
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": [
+    "src/main/**/*.js",
+    "src/preload/**/*.js",
+    "scripts/**/*.js",
+    "scripts/**/*.mjs",
+    "test/**/*.js"
+  ],
+  "exclude": ["node_modules", "dist", "out", "build"]
+}
