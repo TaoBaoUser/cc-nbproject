@@ -39,7 +39,13 @@ function shouldDropUp(el: HTMLElement): boolean {
  * 这里用普通 <input> + 一个可滚动候选列表实现，同时保留自由输入能力 ——
  * 没有 /v1/models 的供应商（DeepSeek）候选为空时，输入框退化为普通文本框。
  */
-export default function Combobox({ value, options, placeholder, onCommit, onRequestModels }: Props) {
+export default function Combobox({
+  value,
+  options,
+  placeholder,
+  onCommit,
+  onRequestModels,
+}: Props) {
   const [draft, setDraft] = useState(value);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);

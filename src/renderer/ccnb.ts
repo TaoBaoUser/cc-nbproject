@@ -36,7 +36,11 @@ export interface CcnbApi {
   previewClaudeSettings(): Promise<PreviewResult>;
   takeoverClaude(): Promise<TakeoverActionResult>;
   disconnectClaude(): Promise<TakeoverActionResult>;
-  listModels(payload: { baseUrl: string; apiKey?: string; force?: boolean }): Promise<ModelListResult>;
+  listModels(payload: {
+    baseUrl: string;
+    apiKey?: string;
+    force?: boolean;
+  }): Promise<ModelListResult>;
   getClaudeModelNames(): Promise<ClaudeModelNames>;
   onLogEvent(callback: (event: LogEvent) => void): () => void;
 }

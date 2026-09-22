@@ -78,7 +78,9 @@ export default function App() {
         {modal?.kind === 'profile' && (
           <ProfileModal profile={modal.profile} api={profilesApi} onClose={closeModal} />
         )}
-        {modal?.kind === 'setup' && <SetupModal onClose={closeModal} onTakeover={claude.takeover} />}
+        {modal?.kind === 'setup' && (
+          <SetupModal onClose={closeModal} onTakeover={claude.takeover} />
+        )}
       </div>
     </div>
   );

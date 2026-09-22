@@ -24,7 +24,9 @@ const CONNECT_TIMEOUT_MS = 15_000;
 /** 本地回环与内网地址永远直连 —— 把它们交给代理是错的。 */
 function isLocalHost(hostname) {
   if (!hostname) return false;
-  const h = String(hostname).replace(/^\[|\]$/g, '').toLowerCase();
+  const h = String(hostname)
+    .replace(/^\[|\]$/g, '')
+    .toLowerCase();
   if (h === 'localhost' || h === '::1' || h === '0.0.0.0') return true;
   // .local 是 mDNS 局域网域名；.localhost 按 RFC 6761 也指向本机
   if (h.endsWith('.localhost') || h.endsWith('.local')) return true;
@@ -72,7 +74,15 @@ function readEnv(...names) {
 
 // 环境变量里代理只认这几个字段，其余（如 NO_PROXY 命中）交给 isBypassed 判断
 function fromEnv() {
-  const raw = readEnv('CCNB_PROXY', 'HTTPS_PROXY', 'https_proxy', 'ALL_PROXY', 'all_proxy', 'HTTP_PROXY', 'http_proxy');
+  const raw = readEnv(
+    'CCNB_PROXY',
+    'HTTPS_PROXY',
+    'https_proxy',
+    'ALL_PROXY',
+    'all_proxy',
+    'HTTP_PROXY',
+    'http_proxy'
+  );
   const url = normalizeProxyUrl(raw);
   if (!url) return null;
   return { url, source: 'env' };
@@ -87,8 +97,12 @@ function fromScutil() {
     return null;
   }
   const on = /HTTPS?Enable\s*:\s*1/.test(out);
-  const host = (out.match(/\bHTTPSProxy\s*:\s*(\S+)/) || out.match(/\bHTTPProxy\s*:\s*(\S+)/) || [])[1];
-  const port = (out.match(/\bHTTPSPort\s*:\s*(\d+)/) || out.match(/\bHTTPPort\s*:\s*(\d+)/) || [])[1];
+  const host = (out.match(/\bHTTPSProxy\s*:\s*(\S+)/) ||
+    out.match(/\bHTTPProxy\s*:\s*(\S+)/) ||
+    [])[1];
+  const port = (out.match(/\bHTTPSPort\s*:\s*(\d+)/) ||
+    out.match(/\bHTTPPort\s*:\s*(\d+)/) ||
+    [])[1];
   if (!on || !host || !port) return null;
   const url = normalizeProxyUrl(`${host}:${port}`);
   if (!url) return null;
@@ -129,9 +143,14 @@ function current() {
 
 /** 命中了 NO_PROXY / 系统例外清单？ */
 function isBypassed(hostname, proxy) {
-  const h = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
+  const h = String(hostname || '')
+    .replace(/^\[|\]$/g, '')
+    .toLowerCase();
   if (!h) return false;
-  const lists = [readEnv('CCNB_NO_PROXY', 'NO_PROXY', 'no_proxy'), (proxy && proxy.exceptions || []).join(',')];
+  const lists = [
+    readEnv('CCNB_NO_PROXY', 'NO_PROXY', 'no_proxy'),
+    ((proxy && proxy.exceptions) || []).join(','),
+  ];
   const patterns = lists
     .filter(Boolean)
     .join(',')
@@ -161,8 +180,9 @@ class HttpOverProxyAgent extends http.Agent {
     let socket;
     if (this.proxy.protocol === 'https:') {
       // 代理本身也走 TLS（少见，但得支持）
-      socket = tls.connect({ host: this.proxy.hostname, port, servername: this.proxy.hostname }, () =>
-        callback(null, socket)
+      socket = tls.connect(
+        { host: this.proxy.hostname, port, servername: this.proxy.hostname },
+        () => callback(null, socket)
       );
     } else {
       socket = net.connect({ host: this.proxy.hostname, port }, () => callback(null, socket));
@@ -217,7 +237,13 @@ class HttpsOverProxyAgent extends https.Agent {
       socket.setTimeout(0); // 隧道已建立，后续超时交给调用方
       if (res.statusCode !== 200) {
         socket.destroy();
-        return callback(markProxyError(new Error(`拒绝建立隧道（HTTP ${res.statusCode}）`), this.proxyUrl, 'reject'));
+        return callback(
+          markProxyError(
+            new Error(`拒绝建立隧道（HTTP ${res.statusCode}）`),
+            this.proxyUrl,
+            'reject'
+          )
+        );
       }
       // 只挑 TLS 认识的那几个键传下去 —— options 里还带着 path、headers 等
       // http 专用字段，整个丢给 tls.connect 会把 path 当成 unix socket 路径。
@@ -234,10 +260,26 @@ class HttpsOverProxyAgent extends https.Agent {
 }
 
 const TLS_OPTION_KEYS = [
-  'ca', 'cert', 'key', 'pfx', 'passphrase', 'rejectUnauthorized', 'servername',
-  'minVersion', 'maxVersion', 'ciphers', 'secureProtocol', 'ALPNProtocols',
-  'checkServerIdentity', 'crl', 'dhparam', 'ecdhCurve', 'honorCipherOrder',
-  'sessionIdContext', 'sigalgs', 'secureContext',
+  'ca',
+  'cert',
+  'key',
+  'pfx',
+  'passphrase',
+  'rejectUnauthorized',
+  'servername',
+  'minVersion',
+  'maxVersion',
+  'ciphers',
+  'secureProtocol',
+  'ALPNProtocols',
+  'checkServerIdentity',
+  'crl',
+  'dhparam',
+  'ecdhCurve',
+  'honorCipherOrder',
+  'sessionIdContext',
+  'sigalgs',
+  'secureContext',
 ];
 
 function pickTlsOptions(options) {

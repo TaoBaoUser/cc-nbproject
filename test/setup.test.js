@@ -81,7 +81,6 @@ function has(obj, key) {
   return Object.prototype.hasOwnProperty.call(obj || {}, key);
 }
 
-
 test('extractModelNames：指向同一模型名的多个键被合并成一条', () => {
   // 这是真实的配置形状 —— 主模型、Opus、Sonnet 三个键指向同一个名字。
   // 若不去重，用户要在界面上为同一个模型名配三遍。
@@ -249,7 +248,10 @@ test('1. 接管：首次接入记录 previous/fileExisted、产生一个备份�
   // 备份恰好一个，且内容是接管前的原文
   const backups = rig.backups();
   assert.equal(backups.length, 1);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(rig.dir, backups[0]), 'utf8')), USER_SETTINGS);
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(rig.dir, backups[0]), 'utf8')),
+    USER_SETTINGS
+  );
 
   // 权限必须是 0600：这个文件里有用户的真实 API key。
   // 漏掉这一项时，rename 会把用户原本 0600 的文件静默放宽成 0644。
@@ -546,7 +548,10 @@ test('11b. 接管：手上已有 previous 时，残留只刷新 applied，previo
     settings: { env: { ANTHROPIC_BASE_URL: PROXY_URL, ANTHROPIC_AUTH_TOKEN: LOCAL_TOKEN } },
   });
 
-  const result = rig.setup.applyClaudeSettings({ proxyBaseUrl: PROXY_URL, previousTakeover: prior });
+  const result = rig.setup.applyClaudeSettings({
+    proxyBaseUrl: PROXY_URL,
+    previousTakeover: prior,
+  });
 
   assert.equal(result.residualDetected, true);
   // 残渣覆盖掉的是 applied，用户的原值必须活着
@@ -648,4 +653,3 @@ test('13b. 预览：只读不写，且备份只给布尔语义、不给具体路
   });
   assert.equal(second.willBackup, false);
 });
-

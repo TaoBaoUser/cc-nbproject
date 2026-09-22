@@ -82,7 +82,10 @@ export default function ModelPicker({ profile, api }: Props) {
       setFields(pairs);
       setNamesChecked(true);
       if (pairs.length === 0) {
-        setStatus({ text: '读不到 Claude Code 的模型名，请到「编辑 → 高级」手动填写映射', warn: true });
+        setStatus({
+          text: '读不到 Claude Code 的模型名，请到「编辑 → 高级」手动填写映射',
+          warn: true,
+        });
       } else if (namesRetry > 0) {
         // 重读成功：把上一次的警告清掉，否则行出来了、警告还挂在下面
         setStatus({ text: '', warn: false });
@@ -134,7 +137,10 @@ export default function ModelPicker({ profile, api }: Props) {
   const suggestions: Array<{ field: Field; guess: string }> = [];
   for (const field of fields) {
     if (map[field.name]) continue;
-    const guess = suggestModelMapping(field.name, modelItems.map((m) => m.id));
+    const guess = suggestModelMapping(
+      field.name,
+      modelItems.map((m) => m.id)
+    );
     if (guess) suggestions.push({ field, guess });
   }
 
@@ -180,7 +186,9 @@ export default function ModelPicker({ profile, api }: Props) {
       </div>
 
       {extras.length > 0 && (
-        <div className="card-note">另有 {extras.length} 条手动规则：{extras.join('，')}</div>
+        <div className="card-note">
+          另有 {extras.length} 条手动规则：{extras.join('，')}
+        </div>
       )}
 
       <div className={`card-model-status${status.warn ? ' is-warn' : ''}`}>

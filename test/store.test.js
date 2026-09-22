@@ -109,7 +109,9 @@ test('patchTakeover：合并而不是整份覆盖，不会把别人的字段抹�
   });
 
   // 退出还原时只更新 lastRestore
-  rig.store.patchTakeover({ lastRestore: { ok: true, at: '2026-09-22T10:00:00.000Z', reason: null } });
+  rig.store.patchTakeover({
+    lastRestore: { ok: true, at: '2026-09-22T10:00:00.000Z', reason: null },
+  });
 
   const after = rig.store.getTakeover();
   assert.equal(after.lastRestore.ok, true);
@@ -123,7 +125,9 @@ test('patchTakeover：在从未接管过时只写 patch 里的字段，绝不凭
   const rig = makeStore();
 
   // 接管失败时主进程走的就是这条路：只记 lastApply，不碰 enabled
-  rig.store.patchTakeover({ lastApply: { ok: false, at: '2026-09-22T10:00:00.000Z', reason: '代理未运行' } });
+  rig.store.patchTakeover({
+    lastApply: { ok: false, at: '2026-09-22T10:00:00.000Z', reason: '代理未运行' },
+  });
 
   const after = rig.store.getTakeover();
   assert.deepEqual(Object.keys(after), ['lastApply']);
@@ -163,7 +167,9 @@ test('接管状态与凭证互不干扰：写其一时另一个原样保留', ()
 
   const token = rig.store.getLocalToken();
   rig.store.setTakeover({ enabled: true, previous: PREVIOUS });
-  rig.store.patchTakeover({ lastApply: { ok: true, at: '2026-09-22T10:00:00.000Z', reason: null } });
+  rig.store.patchTakeover({
+    lastApply: { ok: true, at: '2026-09-22T10:00:00.000Z', reason: null },
+  });
 
   // 两者都走 load() → save() 的读改写，很容易出现「后写的把先写的冲掉」
   assert.equal(rig.store.getLocalToken(), token);

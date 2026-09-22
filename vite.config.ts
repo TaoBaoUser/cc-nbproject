@@ -59,7 +59,7 @@ function devCsp(): Plugin {
        */
       return html.replace(
         /<meta\s+http-equiv="Content-Security-Policy"[\s\S]*?\/>/,
-        '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:; connect-src \'self\' ws: http: https:;" />'
+        "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: http: https:;\" />"
       );
     },
   };

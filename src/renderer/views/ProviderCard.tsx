@@ -39,7 +39,9 @@ export default function ProviderCard({ profile, isActive, testResult, api, onEdi
 
         {result && (
           <>
-            <div className={`test-result ${result.ok === true ? 'ok' : result.ok === false ? 'fail' : ''}`}>
+            <div
+              className={`test-result ${result.ok === true ? 'ok' : result.ok === false ? 'fail' : ''}`}
+            >
               {result.text}
             </div>
             {result.detail && (

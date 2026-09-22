@@ -82,26 +82,54 @@ function withEnv(vars) {
   };
 }
 
-const PROXY_ENV_KEYS = ['CCNB_PROXY', 'HTTPS_PROXY', 'https_proxy', 'ALL_PROXY', 'all_proxy', 'HTTP_PROXY', 'http_proxy'];
+const PROXY_ENV_KEYS = [
+  'CCNB_PROXY',
+  'HTTPS_PROXY',
+  'https_proxy',
+  'ALL_PROXY',
+  'all_proxy',
+  'HTTP_PROXY',
+  'http_proxy',
+];
 const NO_PROXY_KEYS = ['CCNB_NO_PROXY', 'NO_PROXY', 'no_proxy'];
 
 function clearProxyEnv() {
-  return withEnv(Object.fromEntries([...PROXY_ENV_KEYS, ...NO_PROXY_KEYS].map((k) => [k, undefined])));
+  return withEnv(
+    Object.fromEntries([...PROXY_ENV_KEYS, ...NO_PROXY_KEYS].map((k) => [k, undefined]))
+  );
 }
 
 // ---------------------------------------------------------------- 哪些地址不该走代理
 
 test('本地与内网地址一律直连', () => {
   for (const h of [
-    'localhost', 'LOCALHOST', '127.0.0.1', '127.1.2.3', '::1', '0.0.0.0',
-    '10.0.0.5', '192.168.1.1', '172.16.0.1', '172.31.255.255', '169.254.1.1',
-    'fc00::1', 'fd12:3456::1', 'printer.local', 'foo.localhost',
+    'localhost',
+    'LOCALHOST',
+    '127.0.0.1',
+    '127.1.2.3',
+    '::1',
+    '0.0.0.0',
+    '10.0.0.5',
+    '192.168.1.1',
+    '172.16.0.1',
+    '172.31.255.255',
+    '169.254.1.1',
+    'fc00::1',
+    'fd12:3456::1',
+    'printer.local',
+    'foo.localhost',
   ]) {
     assert.equal(isLocalHost(h), true, `${h} 应当直连`);
   }
   for (const h of [
-    'openrouter.ai', 'api.deepseek.com', '8.8.8.8', '172.32.0.1', '172.15.0.1',
-    'notlocal.com', 'local.example.com', '203.0.113.9',
+    'openrouter.ai',
+    'api.deepseek.com',
+    '8.8.8.8',
+    '172.32.0.1',
+    '172.15.0.1',
+    'notlocal.com',
+    'local.example.com',
+    '203.0.113.9',
   ]) {
     assert.equal(isLocalHost(h), false, `${h} 应当走代理`);
   }
@@ -120,7 +148,10 @@ test('172.16-172.31 是内网，172.32 不是', () => {
 test('代理串解析：补全协议、拒绝无法支持的协议', () => {
   assert.equal(normalizeProxyUrl('127.0.0.1:7890'), 'http://127.0.0.1:7890');
   assert.equal(normalizeProxyUrl('http://127.0.0.1:7890'), 'http://127.0.0.1:7890');
-  assert.equal(normalizeProxyUrl('https://proxy.example.com:8443'), 'https://proxy.example.com:8443');
+  assert.equal(
+    normalizeProxyUrl('https://proxy.example.com:8443'),
+    'https://proxy.example.com:8443'
+  );
   assert.equal(normalizeProxyUrl('  http://127.0.0.1:7890  '), 'http://127.0.0.1:7890');
   // socks 需要额外握手实现 —— 返回 null 让它显式不被支持，而不是被当成直连悄悄放过去
   assert.equal(normalizeProxyUrl('socks5://127.0.0.1:7890'), null);
@@ -144,7 +175,15 @@ test('环境变量读取：CCNB_PROXY 优先于通用变量', () => {
     restore();
   }
 
-  const restore2 = withEnv({ CCNB_PROXY: undefined, HTTPS_PROXY: undefined, https_proxy: undefined, ALL_PROXY: 'http://127.0.0.1:3333', all_proxy: undefined, HTTP_PROXY: undefined, http_proxy: undefined });
+  const restore2 = withEnv({
+    CCNB_PROXY: undefined,
+    HTTPS_PROXY: undefined,
+    https_proxy: undefined,
+    ALL_PROXY: 'http://127.0.0.1:3333',
+    all_proxy: undefined,
+    HTTP_PROXY: undefined,
+    http_proxy: undefined,
+  });
   try {
     assert.deepEqual(fromEnv(), { url: 'http://127.0.0.1:3333', source: 'env' });
   } finally {
@@ -215,7 +254,11 @@ test('getAgent：有代理时远端返回 agent，本地返回 undefined', () =>
     // 本地地址即便配了代理也必须直连 —— 否则本地供应商和测试用的假上游全废
     assert.equal(getAgent('127.0.0.1', false), undefined);
     assert.equal(getAgent('localhost', true), undefined);
-    assert.deepEqual(proxyInfo(), { enabled: true, url: 'http://127.0.0.1:7890', source: 'system' });
+    assert.deepEqual(proxyInfo(), {
+      enabled: true,
+      url: 'http://127.0.0.1:7890',
+      source: 'system',
+    });
   } finally {
     __reset();
     restore();
@@ -243,7 +286,14 @@ test('明文 http 目标经代理：request line 必须是绝对 URI', async () 
     const agent = new HttpOverProxyAgent(`http://user:pw@127.0.0.1:${fake.port}`);
     const body = await new Promise((resolve, reject) => {
       const req = http.request(
-        { protocol: 'http:', hostname: 'example.invalid', port: 80, path: '/hello?x=1', method: 'GET', agent },
+        {
+          protocol: 'http:',
+          hostname: 'example.invalid',
+          port: 80,
+          path: '/hello?x=1',
+          method: 'GET',
+          agent,
+        },
         (res) => {
           let t = '';
           res.on('data', (d) => (t += d));
@@ -362,7 +412,11 @@ test('手动指定的代理优先于自动探测', () => {
   try {
     __setDetectorForTest(() => ({ url: 'http://127.0.0.1:7890', source: 'system' }));
     __setOverrideForTest('http://127.0.0.1:9999');
-    assert.deepEqual(proxyInfo(), { enabled: true, url: 'http://127.0.0.1:9999', source: 'manual' });
+    assert.deepEqual(proxyInfo(), {
+      enabled: true,
+      url: 'http://127.0.0.1:9999',
+      source: 'manual',
+    });
 
     __setOverrideForTest(null); // 显式直连
     assert.deepEqual(proxyInfo(), { enabled: false, url: null, source: null });

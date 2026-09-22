@@ -168,7 +168,11 @@ function requestModels({ baseUrl, apiKey, timeoutMs = DEFAULT_TIMEOUT_MS }) {
     });
 
     req.on('error', (err) => {
-      resolve({ ok: false, kind: 'network_error', message: describeProxyError(err) || err.message });
+      resolve({
+        ok: false,
+        kind: 'network_error',
+        message: describeProxyError(err) || err.message,
+      });
     });
 
     req.end();

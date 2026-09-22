@@ -182,8 +182,8 @@ export default function SetupModal({ onClose, onTakeover }: Props) {
 
       <p className="hint">
         ANTHROPIC_AUTH_TOKEN 写入的不是你的真实 API key，而是本工具生成的一串本地准入凭证
-        （每次安装各不相同）。真实 key 仍由本工具保管并按请求注入，因此它不会出现在
-        Claude Code 的配置里；本机其它程序就算发现了代理端口，没有这串凭证也用不了。
+        （每次安装各不相同）。真实 key 仍由本工具保管并按请求注入，因此它不会出现在 Claude Code
+        的配置里；本机其它程序就算发现了代理端口，没有这串凭证也用不了。
         {'\n'}模型相关的配置项（ANTHROPIC_MODEL 等）一概不动。
       </p>
 
