@@ -181,6 +181,39 @@ async function waitForPage(timeoutMs = 20000) {
   throw new Error('等不到渲染进程页面：应用可能没起来，或调试端口没打开');
 }
 
+/**
+ * 开 Runtime 域之前，先确认已经挂在**真正提交的那份文档**上。
+ *
+ * 这个顺序不是随手写的，是本仓库踩过的坑。在 Electron 42~44 上，若 `Runtime.enable`
+ * 是挂在页面 target 上的**第一条**命令，它会逼出一个脚本上下文，而该上下文会落在
+ * frame 的「初始空文档」上 —— 空文档没有 startup data，sandbox bundle 第一行就解构
+ * 失败，打出（一次命中恰好两条）：
+ *
+ *   Electron sandboxed_renderer.bundle.js script failed to run
+ *   TypeError: Cannot destructure property 'preloadScripts' of 'binding.startupData' as it is null.
+ *
+ * 这是**上游问题**（electron#54149；修复 PR #54155 于 2026-09-21 合入 44-x-y，
+ * 而当前锁定的 44.4.3 尚未包含），且只波及那个空文档 —— 随后提交的文档照常拿到
+ * bundle 与 preload，所以 41 条功能断言全过、只剩这两条噪音，看着才像「偶发」。
+ *
+ * `Page.enable` 不逼出脚本上下文，且会等到 frame 就绪（实测在慢机器上被压住几十毫秒，
+ * 在「导航迟迟不提交」的复现里有数秒）。把它排在 `Runtime.enable` 前面，后者就落到
+ * 已提交的文档上了。实测（本机 CPU 加压到 N-1 核）：旧顺序 9 次里 8 次报错，调换后
+ * 15 次一次没再出现。
+ *
+ * 这层检查本身也是有用的断言：若 frame 迟迟不显示 index.html，说明挂错了 target，
+ * 应当直接失败，而不是继续跑一堆没有意义的断言。
+ */
+async function waitForDocumentCommit(send, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const { frameTree } = await send('Page.getFrameTree');
+    if ((frameTree?.frame?.url ?? '').includes('index.html')) return;
+    await sleep(10);
+  }
+  throw new Error('等不到页面文档提交：调试目标出现了，但首个导航始终没落地');
+}
+
 async function connect(page) {
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
@@ -219,8 +252,10 @@ async function connect(page) {
       ws.send(JSON.stringify({ id, method, params }));
     });
 
-  await send('Runtime.enable');
+  // 顺序要紧，别调换：先 Page 域，再 Runtime 域。理由见 waitForDocumentCommit。
   await send('Page.enable');
+  await waitForDocumentCommit(send);
+  await send('Runtime.enable');
 
   const evaluate = async (expression) => {
     const result = await send('Runtime.evaluate', {
