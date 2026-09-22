@@ -43,8 +43,11 @@
 
 ## 安装
 
+需要 **Node.js ≥ 22.12**（见 `package.json` 的 `engines`；`npm run smoke` 依赖 Node 22 的全局 `WebSocket`）。
+仓库里有 `.nvmrc`，`nvm use` 即可对齐。
+
 ```bash
-git clone <repo-url>
+git clone https://github.com/TaoBaoUser/cc-nbproject.git
 cd cc-nbproject
 npm install
 ```
@@ -81,12 +84,12 @@ npm start        # 启动应用
 
 ### 接管是双向的
 
-| 时机 | 行为 |
-|---|---|
+| 时机           | 行为                                     |
+| -------------- | ---------------------------------------- |
 | 点「确认接管」 | 备份（仅首次）→ 写入配置，记住你原本的值 |
-| 之后每次启动 | 自动接管，不再询问 |
-| **每次退出** | **自动还原成你原来的配置** |
-| 点「断开接入」 | 还原 + 清除授权记忆（此后启动不再接管） |
+| 之后每次启动   | 自动接管，不再询问                       |
+| **每次退出**   | **自动还原成你原来的配置**               |
+| 点「断开接入」 | 还原 + 清除授权记忆（此后启动不再接管）  |
 
 还原只针对 `ANTHROPIC_BASE_URL` 与 `ANTHROPIC_AUTH_TOKEN` 两个键，
 模型名、权限、hooks 等一概不碰；**你自己手改过的键不会被覆盖**，应用会告诉你哪一项被跳过了。
@@ -155,9 +158,10 @@ src/
 
 scripts/
 ├── dev.mjs          # dev 模式：Vite dev server + Electron
-├── ui-smoke.js      # 用 CDP 驱动真实窗口的渲染进程冒烟检查
-├── takeover-e2e.js  # 接管/还原的真 Electron 端到端检查
-└── e2e-app/         # 上面那个用的 Electron 入口（不是生产代码）
+├── smoke.js         # 用 CDP 驱动真实窗口的渲染进程冒烟检查
+└── e2e/             # 接管/还原的真 Electron 端到端检查
+    ├── run.js       #   driver：场景定义与断言
+    └── app/         #   它启动的 Electron 入口（不是生产代码）
 
 test/                # node --test 的单元测试
 ```
@@ -182,13 +186,18 @@ test/                # node --test 的单元测试
 
 ## 文档
 
-- [项目速览](docs/项目速览.md) —— 一页硬事实，第一次接触这个仓库先读它
+**[项目文档](docs/项目文档.md) 是总入口** —— 把「这是什么、怎么用、怎么改、怎么验、踩过什么坑」收在一处。
+
+- [项目文档](docs/项目文档.md) —— **总入口**，建议先读它
+- [项目速览](docs/项目速览.md) —— 一页硬事实，只想快速了解就读这个
 - [架构说明](docs/架构说明.md) —— 代码地图与「我想做 X → 改哪里」
 - [工程约束](docs/工程约束.md) —— 分层、约定、验证要求、评审清单
 - [审计发现与处置](docs/审计发现与处置.md) —— 已修缺陷与守护它们的测试
 - [设计文档](docs/plans/2026-09-21-cc-nbproject-design.md) —— 架构决策与取舍的完整记录
   （**注意第 3.3 节「前端不使用框架」已过时**，渲染进程已迁到 React）
 - [实现计划](docs/plans/) —— 分步实现路线
+- [CONTRIBUTING.md](CONTRIBUTING.md) —— 怎么提一个能合进去的改动
+- [CHANGELOG.md](CHANGELOG.md) —— 版本变更历史
 - [CLAUDE.md](CLAUDE.md) —— 给 AI 的硬规则
 
 ## License
