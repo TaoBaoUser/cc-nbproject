@@ -1,13 +1,21 @@
 # 持续集成。
 #
 # 这个仓库有一套三级验证策略（见 docs/工程约束.md 第 5 节），但在这份工作流出现
-# 之前，**三级全靠人记得手动跑**。CI 把它们变成合并前的硬门槛。
+# 之前，**三级全靠人记得手动跑**。
 #
-# 三级里只有前两级能自动化：
-#
-#   第 1 级  tsc + lint + 单测        → job: check（ubuntu，快）
+#   第 1 级  tsc + lint + 格式 + 单测   → job: check（ubuntu，快）
 #   第 2 级  真 Electron 端到端        → job: e2e（macOS，慢）
 #   第 3 级  真实窗口冒烟 smoke.js     → **不进 CI，且永远不要进**
+#
+# 两个 job 都在 push 与 PR 上跑。本仓库是 public，而**标准** GitHub-hosted runner
+# 在公开仓库上的用量免费且不限分钟（官方原文："Use of the standard GitHub-hosted
+# runners is free and unlimited on public repositories."），所以不必再为额度做取舍。
+# ⚠️ 这条免费只覆盖标准 runner：一旦把 runs-on 换成 `*-larger`，**即使公开仓库也
+# 照价计费**（"Larger runners are always charged for, even when used by public
+# repositories"）。本文件用的是 macos-latest，属标准 runner。
+#
+# 公开后真正的约束不是钱，而是**并发**：Free 计划总并发 20、其中 macOS 最多 5。
+# macOS 那 5 个槽才是稀缺资源 —— 下面 `needs` 与 `timeout-minutes` 的理由都在这里。
 #
 # 第 3 级为什么排除在外：smoke.js 连的是**用户正在运行的那个实例**，还要从
 # 用户已有的供应商里抄 baseUrl 与 apiKey 去建一次性供应商。CI 里既没有「用户
@@ -33,6 +41,10 @@ jobs:
   check:
     name: 静态检查与单元测试
     runs-on: ubuntu-latest
+    # 兜底，不是预期耗时（正常 1~2 分钟）。job 的默认超时是 360 分钟，
+    # 一旦某步挂住（网络、npm registry 无响应）就会一直占着并发槽 ——
+    # Free 计划总并发只有 20，一个挂死的 run 能把后面排队的全堵住。
+    timeout-minutes: 15
     # 备注：这里原本想用 ELECTRON_SKIP_BINARY_DOWNLOAD=1 跳过 Electron 二进制下载
     # （这个 job 并不启动 Electron），但 electron@44 的 install.js **不识别这个变量** ——
     # 实测 `grep -r ELECTRON_SKIP_BINARY_DOWNLOAD node_modules/electron` 无任何引用，
@@ -57,6 +69,12 @@ jobs:
       - name: 代码规范
         run: npm run lint
 
+      - name: 格式检查
+        # lint 管语义，format:check 管排版，两者不重叠 ——
+        # ESLint 不会因为一行写到 120 字符而报错，Prettier 会。
+        # 本仓曾经「有 .prettierrc 但没人跑过」，接上这条就不会再漂移。
+        run: npm run format:check
+
       - name: 单元测试
         run: npm test
 
@@ -70,13 +88,20 @@ jobs:
     # 必须是 macOS：这一级验的是 `before-quit` 在真实退出路径上会不会触发、
     # `app.exit(0)` 会不会形成退出死循环 —— 那是 Electron 在 macOS 上的退出语义。
     #
-    # ⚠️ 只在 PR 上跑，不在每次 push 到 main 时跑。**这是额度考虑，不是取舍**：
-    # 本仓库是私有仓库，而 GitHub Actions 的 macOS runner 按 **10 倍** 计入额度
-    # （免费额度 2000 分钟/月）。每次 e2e 约烧 20–40 分钟额度，push 触发会让额度
-    # 成倍消耗。PR 是真正的合并门槛，把这一级放在那里收益最高、浪费最少。
-    # 直接 push 到 main 的改动，请在本地跑 `npm run e2e`。
-    if: github.event_name == 'pull_request'
+    # 公开仓库的标准 runner 免费不限分钟，所以这里没有「只在 PR 上跑」的限制 ——
+    # push 与 PR 都跑。稀缺的是并发：Free 计划的 macOS 上限只有 5 个。
+    #
+    # ⚠️ 来自 fork 的 PR：GitHub 默认要求有 write 权限的人**手动批准**才跑 workflow
+    # （针对从未在本仓库合过 commit / PR 的贡献者）。第一个外部 PR 会停在
+    # "Awaiting approval"，那不是 CI 坏了 —— 去 PR 页点 "Approve workflows to run"。
+    #
+    # needs：先跑完第 1 级再起 macOS。反过来的话，check 挂了 e2e 仍会跑到底 ——
+    # 虽然不花钱，但会白占一个 macOS 并发槽，把真正需要它的 run 挤到队尾。
+    needs: check
     runs-on: macos-latest
+    # 兜底。job 默认超时 360 分钟，撞上就是一个槽被占满（单 job 上限 6 小时），
+    # 后面所有 e2e 都排不上队。
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

@@ -197,6 +197,7 @@ test/                # node --test 的单元测试
   （**注意第 3.3 节「前端不使用框架」已过时**，渲染进程已迁到 React）
 - [实现计划](docs/plans/) —— 分步实现路线
 - [CONTRIBUTING.md](CONTRIBUTING.md) —— 怎么提一个能合进去的改动
+- [SECURITY.md](SECURITY.md) —— 怎么报漏洞（**请不要用公开 issue**）
 - [CHANGELOG.md](CHANGELOG.md) —— 版本变更历史
 - [CLAUDE.md](CLAUDE.md) —— 给 AI 的硬规则
 

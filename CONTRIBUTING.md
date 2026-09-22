@@ -102,9 +102,16 @@ npm run e2e        # 真 Electron 端到端
 1. 从 `main` 切分支，别直接在 `main` 上改
 2. 跑完第 2 节要求的验证（CI 也会跑，但本地先跑能省一个来回）
 3. PR 描述里写清：**改了什么、为什么、怎么验证的**
-4. CI 会有两个 job：
-   - `check`（ubuntu）：类型 + 规范 + 单测 + 构建
-   - `e2e`（macOS）：真 Electron 端到端 —— **只在 PR 上跑**（额度考虑，见 CI 文件里的注释）
+4. CI 会有两个 job，**push 与 PR 都会跑**：
+   - `check`（ubuntu）：类型 + 规范 + 格式 + 单测 + 构建
+   - `e2e`（macOS）：真 Electron 端到端
+
+   `e2e` 依赖 `check`：第 1 级挂了它就不会启动 —— 省下一个 macOS 并发槽。
+
+> ⚠️ **第一次提 PR 时 CI 不会自动跑。** 公开仓库默认要求有 write 权限的人
+> **手动批准**来自 fork 的 workflow（针对从未在本仓库合过 commit / PR 的贡献者）。
+> PR 会停在 `Awaiting approval` —— 那不是 CI 坏了，维护者需要去 PR 页点
+> "Approve workflows to run"。这条规则由 GitHub 强制，与本仓库配置无关。
 
 涉及界面或生命周期的改动，**请贴上你实际跑过的命令与输出**。
 「跑过了」不算证据。

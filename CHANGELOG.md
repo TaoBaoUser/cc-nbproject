@@ -14,8 +14,9 @@
 
 ### 新增
 
-- **CI 工作流**（`.github/workflows/ci.yml`）：把第 1、2 级验证变成合并前的硬门槛。
-  e2e 只在 pull request 上跑 —— 仓库为私有，macOS runner 按 10 倍计费
+- **CI 工作流**（`.github/workflows/ci.yml`）：第 1 级（类型 + 规范 + 格式 + 单测 + 构建）
+  与第 2 级（真 Electron 端到端）都挂在每次 push 与 PR 上 —— 本仓库是公开仓库，
+  标准 runner 的用量免费且不限分钟
 - **主进程纳入类型检查**（`tsconfig.main.json`）：此前 `tsc` 只覆盖渲染进程，
   约 6000 行主进程代码（含**唯一会改用户配置**的 `setup.js`）完全在检查盲区。
   采用渐进策略 —— `checkJs: false` 配合逐文件 `// @ts-check`，
