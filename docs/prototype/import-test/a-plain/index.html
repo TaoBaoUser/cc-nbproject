@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>cc-nbproject · 供应商</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #0c0d0e;
+        --bg-sidebar: #0a0b0c;
+        --bg-elevated: #131416;
+        --border: #1e2023;
+        --text: #e8e9ec;
+        --text-dim: #85888f;
+        --text-faint: #5c5f66;
+        --accent: #6e7bf2;
+      }
+      body {
+        font-family: -apple-system, 'SF Pro Text', 'PingFang SC', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        display: flex;
+        font-size: 13.5px;
+      }
+      .sidebar {
+        width: 200px;
+        background: var(--bg-sidebar);
+        border-right: 1px solid var(--border);
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .nav-item {
+        padding: 7px 10px;
+        border-radius: 6px;
+        color: var(--text-dim);
+      }
+      .nav-item.active {
+        background: rgba(110, 123, 242, 0.1);
+        color: var(--text);
+      }
+      .main {
+        flex: 1;
+        padding: 24px;
+        overflow-y: auto;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+      }
+      .card-title {
+        font-size: 13.5px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .card-url {
+        font-size: 11px;
+        color: var(--text-faint);
+        font-family: ui-monospace, monospace;
+      }
+      .btn {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 8px 16px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 7px;
+        font-size: 13.5px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="nav-item active">供应商</div>
+      <div class="nav-item">日志</div>
+      <div class="nav-item">用量</div>
+    </aside>
+    <main class="main">
+      <h1>供应商</h1>
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">DeepSeek</div>
+          <div class="card-url">https://api.deepseek.com/anthropic</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Kimi</div>
+          <div class="card-url">https://api.moonshot.cn/anthropic</div>
+        </div>
+      </div>
+      <button class="btn">接管 Claude Code</button>
+    </main>
+  </body>
+</html>

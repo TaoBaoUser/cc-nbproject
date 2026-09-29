@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="728" viewBox="0 0 1120 728">
+  <rect width="1120" height="728" fill="#0c0d0e"/>
+  <rect x="0" y="0" width="1120" height="728"  fill="rgb(12, 13, 14)"/>
+  <rect x="0" y="0" width="204" height="728"  fill="rgb(10, 11, 12)" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="20" y="32.05" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="13.5" font-weight="600" fill="rgb(236, 236, 238)">cc-nbproject</text>
+  <text x="20" y="49.05" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="11" font-weight="400" fill="rgb(92, 95, 102)">Claude Code 供应商路由</text>
+  <rect x="12" y="72.75" width="179" height="32.75" rx="6" fill="rgba(255, 255, 255, 0.06)"/>
+  <rect x="12" y="80.75" width="2" height="16.75" rx="2" fill="rgb(110, 123, 242)"/>
+  <svg x="21" y="82.13" width="14" height="14" color="rgb(132, 144, 245)" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="4.5" rx="1.5" stroke="currentColor"></rect><rect x="2.5" y="9" width="11" height="4.5" rx="1.5" stroke="currentColor"></rect></svg>
+  <text x="44" y="92" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="500" fill="rgb(236, 236, 238)">供应商</text>
+  <svg x="21" y="115.88" width="14" height="14" color="rgb(133, 136, 143)" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 4.5h10M3 8h10M3 11.5h6" stroke="currentColor" stroke-linecap="round"></path></svg>
+  <text x="44" y="125.75" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">日志</text>
+  <svg x="21" y="149.63" width="14" height="14" color="rgb(133, 136, 143)" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 12.5v-4M8 12.5v-7M12 12.5v-2.5" stroke="currentColor" stroke-linecap="round"></path></svg>
+  <text x="44" y="159.5" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">用量</text>
+  <rect x="12" y="555.25" width="179" height="158.75"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <rect x="20" y="574.13" width="7" height="7" rx="50" fill="rgb(74, 222, 128)"/>
+  <text x="34" y="580.5" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="500" fill="rgb(236, 236, 238)">代理运行中</text>
+  <text x="20" y="604.8" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(133, 136, 143)">http://127.0.0.1:8788</text>
+  <rect x="20" y="628.38" width="7" height="7" rx="50" fill="rgb(248, 113, 113)"/>
+  <text x="34" y="634.75" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="600" fill="rgb(236, 236, 238)">Claude Code 未接管</text>
+  <text x="20" y="653.2" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="11.5" font-weight="400" fill="rgb(133, 136, 143)">接管后 Claude Code 会走本工</text>
+  <text x="20" y="670.45" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="11.5" font-weight="400" fill="rgb(133, 136, 143)">具的代理</text>
+  <rect x="20" y="684.75" width="116.38" height="27.25" rx="6" fill="none" stroke="rgb(43, 45, 49)" stroke-width="1"/>
+  <text x="78.19" y="701.7" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="11.5" font-weight="400" fill="rgb(236, 236, 238)" text-anchor="middle">接管 Claude Code</text>
+  <text x="232" y="44.5" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="20" font-weight="650" fill="rgb(236, 236, 238)">供应商</text>
+  <text x="232" y="69.25" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">点击卡片即可切换，正在运行的 Claude Code 会话无需重启</text>
+  <rect x="1003.5" y="24" width="88.5" height="32.75" rx="6" fill="rgb(110, 123, 242)" stroke="rgb(110, 123, 242)" stroke-width="1"/>
+  <text x="1047.75" y="43.25" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(255, 255, 255)" text-anchor="middle">添加供应商</text>
+  <defs><linearGradient id="bg26" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="rgba(110, 123, 242, 0.18)"/><stop offset="42%" stop-color="rgba(110, 123, 242, 0)"/></linearGradient></defs>
+  <rect x="232" y="93.75" width="425" height="84" rx="6" fill="rgb(19, 20, 22)" stroke="rgba(110, 123, 242, 0.22)" stroke-width="1"/>
+  <rect x="232" y="93.75" width="425" height="84" rx="6" fill="url(#bg26)" stroke="rgba(110, 123, 242, 0.22)" stroke-width="1"/>
+  <rect x="233" y="103.75" width="3" height="64" rx="3" fill="rgb(110, 123, 242)"/>
+  <rect x="246" y="106.75" width="28" height="28" rx="7" fill="rgb(77, 107, 254)"/>
+  <text x="255.61" y="123.85" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12" font-weight="700" fill="rgb(255, 255, 255)">D</text>
+  <text x="281" y="124.68" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="13.5" font-weight="550" fill="rgb(236, 236, 238)">DeepSeek</text>
+  <rect x="353.72" y="112.25" width="44.61" height="17" rx="20" fill="rgb(110, 123, 242)"/>
+  <text x="360.72" y="123.25" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="10" font-weight="500" fill="rgb(255, 255, 255)">使用中</text>
+  <text x="438.3" y="123.75" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="10" font-weight="400" fill="rgb(133, 136, 143)">https://api.deepseek.com/anthropic</text>
+  <text x="246" y="156.8" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="11" font-weight="400" fill="rgb(92, 95, 102)">主模型</text>
+  <rect x="316" y="143.75" width="327" height="21" rx="5" fill="rgba(0, 0, 0, 0.25)" stroke="rgba(0, 0, 0, 0)" stroke-width="1"/>
+  <text x="324" y="157.55" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(117, 117, 117)">原样透传</text>
+  <svg x="626" y="149.25" width="10" height="10" color="rgb(92, 95, 102)" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+  <rect x="667" y="93.75" width="425" height="84" rx="6" fill="rgb(19, 20, 22)" stroke="rgba(0, 0, 0, 0)" stroke-width="1"/>
+  <rect x="681" y="106.75" width="28" height="28" rx="7" fill="rgb(60, 61, 71)"/>
+  <text x="690.83" y="123.85" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12" font-weight="700" fill="rgb(255, 255, 255)">K</text>
+  <text x="716" y="124.68" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="13.5" font-weight="550" fill="rgb(133, 136, 143)">Kimi</text>
+  <text x="879.31" y="123.75" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="10" font-weight="400" fill="rgb(92, 95, 102)">https://api.moonshot.cn/anthropic</text>
+  <text x="681" y="156.8" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="11" font-weight="400" fill="rgb(92, 95, 102)">主模型</text>
+  <rect x="751" y="143.75" width="327" height="21" rx="5" fill="rgba(0, 0, 0, 0.25)" stroke="rgba(0, 0, 0, 0)" stroke-width="1"/>
+  <text x="759" y="157.55" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(117, 117, 117)">原样透传</text>
+  <svg x="1061" y="149.25" width="10" height="10" color="rgb(92, 95, 102)" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+  <rect x="232" y="187.75" width="425" height="84" rx="6" fill="rgb(19, 20, 22)" stroke="rgba(0, 0, 0, 0)" stroke-width="1"/>
+  <rect x="246" y="200.75" width="28" height="28" rx="7" fill="rgb(109, 74, 255)"/>
+  <text x="255.53" y="217.85" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12" font-weight="700" fill="rgb(255, 255, 255)">G</text>
+  <text x="281" y="218.68" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="13.5" font-weight="550" fill="rgb(133, 136, 143)">智谱 GLM</text>
+  <text x="414.22" y="217.75" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="10" font-weight="400" fill="rgb(92, 95, 102)">https://open.bigmodel.cn/api/anthropic</text>
+  <text x="246" y="250.8" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="11" font-weight="400" fill="rgb(92, 95, 102)">主模型</text>
+  <rect x="316" y="237.75" width="327" height="21" rx="5" fill="rgba(0, 0, 0, 0.25)" stroke="rgba(0, 0, 0, 0)" stroke-width="1"/>
+  <text x="324" y="251.55" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(117, 117, 117)">原样透传</text>
+  <svg x="626" y="243.25" width="10" height="10" color="rgb(92, 95, 102)" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+  <rect x="0" y="0" width="1120" height="728"  fill="rgba(0, 0, 0, 0.55)"/>
+  <rect x="240" y="58.23" width="640" height="611.52" rx="12" fill="rgb(19, 20, 22)" stroke="rgb(43, 45, 49)" stroke-width="1"/>
+  <rect x="241" y="59.23" width="638" height="100.5"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="265" y="96.03" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="16" font-weight="600" fill="rgb(236, 236, 238)">接管 Claude Code</text>
+  <text x="265" y="119.48" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">将 Claude Code 的 Anthropic 端点指向本工具的本地代理。这是本工具唯一会修改你现有文件的操</text>
+  <text x="265" y="138.23" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">作。</text>
+  <svg x="835.5" y="83.73" width="13" height="13" color="rgb(92, 95, 102)" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>
+  <rect x="265" y="175.73" width="575" height="62.75" rx="6" fill="rgb(12, 13, 14)" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="280" y="200.98" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">这是一次性授权：确认之后，本工具每次启动会自动接管、退出时自动还原， 不再逐次询问。随时</text>
+  <text x="280" y="220.36" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">可以在侧边栏「断开接入」停用。</text>
+  <rect x="265" y="252.48" width="575" height="62.75" rx="6" fill="rgba(251, 191, 36, 0.1)" stroke="rgba(251, 191, 36, 0.4)" stroke-width="1"/>
+  <text x="280" y="277.73" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(251, 191, 36)">如果你以后不再打算打开本应用，请先点「断开接入」—— 否则 Claude Code 会一直指向一个没</text>
+  <text x="280" y="297.11" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(251, 191, 36)">有运行的代理，从而无法使用。</text>
+  <rect x="265" y="329.23" width="575" height="82.13" rx="6" fill="rgb(12, 13, 14)" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="280" y="354.48" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">目标文件：/var/folders/0p/x5nsk3_d6fn3sv5r5q26ktdm0000gn/T/ccnb-svg-</text>
+  <text x="280" y="373.86" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">mNHLzf/.claude/settings.json 写入前会自动备份一份（文件名带时间戳，成功后会告诉你具体路</text>
+  <text x="280" y="393.23" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(133, 136, 143)">径）</text>
+  <rect x="265.5" y="425.86" width="177.94" height="33"  fill="rgb(12, 13, 14)" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="276" y="445.46" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12" font-weight="500" fill="rgb(133, 136, 143)">配置项</text>
+  <rect x="443.44" y="425.86" width="172.19" height="33"  fill="rgb(12, 13, 14)" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="453.94" y="445.46" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12" font-weight="500" fill="rgb(133, 136, 143)">当前值</text>
+  <rect x="615.63" y="425.86" width="223.88" height="33"  fill="rgb(12, 13, 14)" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="626.13" y="445.46" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12" font-weight="500" fill="rgb(133, 136, 143)">将改为</text>
+  <rect x="265.5" y="458.86" width="177.94" height="48"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="276" y="478.46" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12" font-weight="400" fill="rgb(236, 236, 238)">ANTHROPIC_BASE_URL</text>
+  <rect x="443.44" y="458.86" width="172.19" height="48"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="453.94" y="477.16" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(248, 113, 113)">https://api.deepseek.c</text>
+  <text x="453.94" y="493.66" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(248, 113, 113)">om/anthropic</text>
+  <rect x="615.63" y="458.86" width="223.88" height="48"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="626.13" y="477.16" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(74, 222, 128)">http://127.0.0.1:8788</text>
+  <rect x="265.5" y="506.86" width="177.94" height="64.5"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="276" y="526.46" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12" font-weight="400" fill="rgb(236, 236, 238)">ANTHROPIC_AUTH_TOKEN</text>
+  <rect x="443.44" y="506.86" width="172.19" height="64.5"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="453.94" y="525.16" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(248, 113, 113)">sk-real-user-key</text>
+  <rect x="615.63" y="506.86" width="223.88" height="64.5"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <text x="626.13" y="525.16" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(74, 222, 128)">aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</text>
+  <text x="626.13" y="541.66" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(74, 222, 128)">aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</text>
+  <text x="626.13" y="558.16" font-family="ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="rgb(74, 222, 128)">aaaa</text>
+  <text x="265" y="597.81" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="11.5" font-weight="400" fill="rgb(133, 136, 143)">ANTHROPIC_AUTH_TOKEN 写入的不是你的真实 API key，而是本工具生成的一串本地准入凭证 （每次安装各</text>
+  <rect x="241" y="603" width="638" height="65.75"  fill="none" stroke="rgb(30, 32, 35)" stroke-width="1"/>
+  <rect x="719" y="618" width="51" height="32.75" rx="6" fill="rgb(19, 20, 22)" stroke="rgb(43, 45, 49)" stroke-width="1"/>
+  <text x="744.5" y="637.25" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(236, 236, 238)" text-anchor="middle">取消</text>
+  <rect x="779" y="618" width="76" height="32.75" rx="6" fill="rgb(110, 123, 242)" stroke="rgb(110, 123, 242)" stroke-width="1"/>
+  <text x="817" y="637.25" font-family="-apple-system, &quot;system-ui&quot;, &quot;PingFang SC&quot;, &quot;Hiragino Sans GB&quot;, &quot;Microsoft YaHei&quot;, &quot;Segoe UI&quot;, sans-serif" font-size="12.5" font-weight="400" fill="rgb(255, 255, 255)" text-anchor="middle">确认接管</text>
+</svg>
