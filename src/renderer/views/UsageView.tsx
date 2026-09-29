@@ -8,6 +8,8 @@ function formatNumber(value: number) {
 
 export default function UsageView({ usage }: { usage: UsageApi }) {
   const summary = usage.summary;
+  const byProfile = summary?.byProfile ?? [];
+  const hasRows = byProfile.length > 0;
 
   return (
     <>
@@ -53,33 +55,39 @@ export default function UsageView({ usage }: { usage: UsageApi }) {
         )}
       </div>
 
-      <table className="table">
-        <thead>
-          <tr>
-            <th>供应商</th>
-            <th className="num">请求数</th>
-            <th className="num">输入 token</th>
-            <th className="num">输出 token</th>
-            <th className="num">错误</th>
-          </tr>
-        </thead>
-        <tbody id="usage-table">
-          {(summary?.byProfile ?? []).map((row) => (
-            <tr key={row.profileId}>
-              <td>{row.profileName}</td>
-              <td className="num">{formatNumber(row.requests)}</td>
-              <td className="num">{formatNumber(row.inputTokens)}</td>
-              <td className="num">{formatNumber(row.outputTokens)}</td>
-              <td className="num">{formatNumber(row.errors)}</td>
+      {/* 表头跟着数据一起出现。没有记录时单留一行表头杵在空状态上方，
+          看着像是表格没加载出来，而不是「还没有数据」。 */}
+      {hasRows && (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>供应商</th>
+              <th className="num">请求数</th>
+              <th className="num">输入 token</th>
+              <th className="num">输出 token</th>
+              <th className="num">错误</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody id="usage-table">
+            {byProfile.map((row) => (
+              <tr key={row.profileId}>
+                <td>{row.profileName}</td>
+                <td className="num">{formatNumber(row.requests)}</td>
+                <td className="num">{formatNumber(row.inputTokens)}</td>
+                <td className="num">{formatNumber(row.outputTokens)}</td>
+                <td className="num">{formatNumber(row.errors)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
-      <div className="empty" id="usage-empty" hidden={(summary?.byProfile.length ?? 0) > 0}>
-        <p>还没有用量记录。</p>
-        <p className="hint">通过代理发起的请求会自动记录在这里。</p>
-      </div>
+      {!hasRows && (
+        <div className="empty" id="usage-empty">
+          <p>还没有用量记录。</p>
+          <p className="hint">通过代理发起的请求会自动记录在这里。</p>
+        </div>
+      )}
     </>
   );
 }

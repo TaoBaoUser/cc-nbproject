@@ -144,6 +144,31 @@ export default function Combobox({
     }
   };
 
+  /**
+   * 箭头按钮。
+   *
+   * 关键在 mousedown 上那句 preventDefault：不拦的话，按钮按下时输入框会先失焦，
+   * onBlur 立刻 setOpen(false)，紧接着 click 又 setOpen(true) —— 一开一关，
+   * 表现就是「点了箭头没反应」。
+   *
+   * 键盘用户不受影响：输入框自己就能用聚焦 / 方向键 / Esc 完成全部操作，
+   * 所以这个按钮 tabIndex={-1}，不参与 Tab 顺序，免得焦点在它和输入框之间来回跳。
+   */
+  const onToggle = () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const el = inputRef.current;
+    if (!el) return;
+    setDropUp(shouldDropUp(el));
+    setOpen(true);
+    el.focus();
+    // 输入框本来就聚焦着时 focus() 不触发 focus 事件，这里补一次拉取。
+    // 在途请求由调用方的 fetchingRef 去重，不会真的打两次上游。
+    onRequestModels?.();
+  };
+
   return (
     <div className="combobox" ref={rootRef}>
       <input
@@ -163,6 +188,24 @@ export default function Combobox({
         onKeyDown={onKeyDown}
         onBlur={() => setOpen(false)}
       />
+      <button
+        type="button"
+        className={`combobox-toggle${open ? ' is-open' : ''}`}
+        tabIndex={-1}
+        aria-label="展开模型列表"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onToggle}
+      >
+        <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <path
+            d="M3 4.5 6 7.5 9 4.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
       {open && filtered.length > 0 && (
         <div className={`combobox-list${dropUp ? ' is-up' : ''}`}>
           {filtered.map((o, i) => (

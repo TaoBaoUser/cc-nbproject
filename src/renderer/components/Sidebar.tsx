@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ClaudeStatus, ProxyStatus } from '../types';
 
 type ViewName = 'providers' | 'logs' | 'usage';
@@ -14,10 +15,37 @@ interface Props {
   onDisconnect: () => void;
 }
 
-const NAV: Array<{ name: ViewName; label: string }> = [
-  { name: 'providers', label: '供应商' },
-  { name: 'logs', label: '日志' },
-  { name: 'usage', label: '用量' },
+// 图标一律 stroke=currentColor：导航项在默认/悬停/激活三态下颜色不同，
+// 写死颜色会让图标在激活态里和文字对不上。
+const NAV: Array<{ name: ViewName; label: string; icon: ReactNode }> = [
+  {
+    name: 'providers',
+    label: '供应商',
+    icon: (
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2.5" y="2.5" width="11" height="4.5" rx="1.5" stroke="currentColor" />
+        <rect x="2.5" y="9" width="11" height="4.5" rx="1.5" stroke="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    name: 'logs',
+    label: '日志',
+    icon: (
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M3 4.5h10M3 8h10M3 11.5h6" stroke="currentColor" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    name: 'usage',
+    label: '用量',
+    icon: (
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M4 12.5v-4M8 12.5v-7M12 12.5v-2.5" stroke="currentColor" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 /**
@@ -72,7 +100,8 @@ export default function Sidebar({
             data-view={n.name}
             onClick={() => onSwitchView(n.name)}
           >
-            {n.label}
+            {n.icon}
+            <span>{n.label}</span>
           </button>
         ))}
       </nav>

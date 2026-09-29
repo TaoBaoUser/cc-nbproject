@@ -98,7 +98,9 @@ function bootstrap() {
       minWidth: 900,
       minHeight: 600,
       title: 'cc-nbproject',
-      backgroundColor: '#14161a',
+      // 必须与 style.css 里的 --bg 保持一致：这是窗口还没画出第一帧时的底色，
+      // 对不上就会在启动瞬间闪一下旧配色。
+      backgroundColor: '#0c0d0e',
       show: false,
       webPreferences: {
         preload: path.join(__dirname, '..', 'preload', 'index.js'),

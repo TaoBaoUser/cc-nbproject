@@ -80,7 +80,10 @@ export default function LogsView({ entries, onClear }: Props) {
         </div>
       </header>
 
-      <div className="log-list" id="log-list" ref={listRef}>
+      {/* hidden 而不是不渲染：listRef 上的自动滚动 effect 需要一个稳定的节点。
+          配套的 .log-list[hidden]{display:none} 在 style.css 里，缺了它
+          这条 hidden 会被 display:flex 压掉。 */}
+      <div className="log-list" id="log-list" ref={listRef} hidden={rows.length === 0}>
         {rows.map((r, i) => (
           <div className={r.className} key={i}>
             <span className="log-time">{r.time}</span>
@@ -88,6 +91,11 @@ export default function LogsView({ entries, onClear }: Props) {
             <span className="log-meta">{r.meta}</span>
           </div>
         ))}
+      </div>
+
+      <div className="empty" id="log-empty" hidden={rows.length > 0}>
+        <p>还没有日志。</p>
+        <p className="hint">通过代理发起的请求会自动记录在这里。</p>
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { parseModelMap, findModelMapProblems } from '../model-map.js';
 import { formatModelMap } from '../describe';
+import ModalHead from '../components/ModalHead';
 import type { Profile } from '../types';
 import type { ProfilesApi } from '../hooks/useProfiles';
 
@@ -64,80 +65,88 @@ export default function ProfileModal({ profile, api, onClose }: Props) {
 
   return (
     <div className="modal">
-      <h2>{isEdit ? '编辑供应商' : '添加供应商'}</h2>
-      <p className="modal-sub">
-        {isEdit
-          ? '修改后立即生效，无需重启。模型在卡片上直接选'
-          : '填入 Anthropic 兼容端点的地址与凭证，模型稍后在卡片上选'}
-      </p>
+      <ModalHead
+        title={isEdit ? '编辑供应商' : '添加供应商'}
+        sub={
+          isEdit
+            ? '修改后立即生效，无需重启。模型在卡片上直接选'
+            : '填入 Anthropic 兼容端点的地址与凭证，模型稍后在卡片上选'
+        }
+        onClose={onClose}
+      />
 
-      <div className="field">
-        <label>名称</label>
-        <input
-          type="text"
-          placeholder="例如：DeepSeek"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-
-      <div className="field">
-        <label>Base URL</label>
-        <input
-          type="text"
-          placeholder="https://api.deepseek.com/anthropic"
-          value={baseUrl}
-          onChange={(e) => setBaseUrl(e.target.value)}
-        />
-        <div className="field-hint">Anthropic 兼容端点，通常以 /anthropic 结尾（视供应商而定）</div>
-      </div>
-
-      <div className="field">
-        <label>API Key</label>
-        <input
-          type="password"
-          placeholder="sk-..."
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-        />
-        <div className="field-hint">
-          仅保存在本机 ~/.cc-nbproject/，文件权限 600，不会进入任何版本库
-        </div>
-      </div>
-
-      {/* 映射收进「高级」：常规用法是到卡片上选模型，只有下拉覆盖不到的边角情况才需要手写规则 */}
-      <details className="advanced">
-        <summary>
-          {mapCount > 0 ? `高级：手动映射规则（已有 ${mapCount} 条）` : '高级：手动映射规则'}
-        </summary>
+      {/* 输入框顺序是冒烟检查的契约：名称 / Base URL / API Key，
+          三个 input，inputs[1] 必须是 Base URL。只包结构，不动顺序和数量。 */}
+      <div className="modal-body">
         <div className="field">
-          <label>模型映射</label>
-          <textarea
-            className="textarea"
-            rows={4}
-            spellCheck={false}
-            /* 占位示例必须是真实可用的一对。用户会直接照着改，示例里的目标名
-               但凡写错，就变成了把人往坑里带 —— 这里曾把 flash 误写成 deepseek-chat
-               （那是 V3），照抄会把后台小任务模型指到错误的代次上。 */
-            placeholder={
-              'deepseek-v4-pro=deepseek/deepseek-v4-pro\ndeepseek-flash=deepseek/deepseek-v4-flash'
-            }
-            value={mapText}
-            onChange={(e) => setMapText(e.target.value)}
+          <label>名称</label>
+          <input
+            type="text"
+            placeholder="例如：DeepSeek"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label>Base URL</label>
+          <input
+            type="text"
+            placeholder="https://api.deepseek.com/anthropic"
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
           />
           <div className="field-hint">
-            Claude Code 发出的模型名在不同供应商那里叫法不同。每行一条「源=目标」，
-            未命中的模型名将原样转发。留空则不启用映射。
-          </div>
-          <div className={mapStatus.isWarn ? 'field-status is-warn' : 'field-status'}>
-            {mapStatus.text}
+            Anthropic 兼容端点，通常以 /anthropic 结尾（视供应商而定）
           </div>
         </div>
-      </details>
 
-      <div className="error-text">{error}</div>
+        <div className="field">
+          <label>API Key</label>
+          <input
+            type="password"
+            placeholder="sk-..."
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+          />
+          <div className="field-hint">
+            仅保存在本机 ~/.cc-nbproject/，文件权限 600，不会进入任何版本库
+          </div>
+        </div>
+
+        {/* 映射收进「高级」：常规用法是到卡片上选模型，只有下拉覆盖不到的边角情况才需要手写规则 */}
+        <details className="advanced">
+          <summary>
+            {mapCount > 0 ? `高级：手动映射规则（已有 ${mapCount} 条）` : '高级：手动映射规则'}
+          </summary>
+          <div className="field">
+            <label>模型映射</label>
+            <textarea
+              className="textarea"
+              rows={4}
+              spellCheck={false}
+              /* 占位示例必须是真实可用的一对。用户会直接照着改，示例里的目标名
+                 但凡写错，就变成了把人往坑里带 —— 这里曾把 flash 误写成 deepseek-chat
+                 （那是 V3），照抄会把后台小任务模型指到错误的代次上。 */
+              placeholder={
+                'deepseek-v4-pro=deepseek/deepseek-v4-pro\ndeepseek-flash=deepseek/deepseek-v4-flash'
+              }
+              value={mapText}
+              onChange={(e) => setMapText(e.target.value)}
+            />
+            <div className="field-hint">
+              Claude Code 发出的模型名在不同供应商那里叫法不同。每行一条「源=目标」，
+              未命中的模型名将原样转发。留空则不启用映射。
+            </div>
+            <div className={mapStatus.isWarn ? 'field-status is-warn' : 'field-status'}>
+              {mapStatus.text}
+            </div>
+          </div>
+        </details>
+      </div>
 
       <div className="modal-actions">
+        <div className="error-text">{error}</div>
         <button className="btn" onClick={onClose}>
           取消
         </button>

@@ -1,5 +1,6 @@
 import ModelPicker from '../components/ModelPicker';
 import { describeTestResult } from '../describe';
+import { vendorBrand } from '../vendor-brand';
 import type { Profile, TestResult } from '../types';
 import type { ProfilesApi } from '../hooks/useProfiles';
 
@@ -13,6 +14,7 @@ interface Props {
 
 export default function ProviderCard({ profile, isActive, testResult, api, onEdit }: Props) {
   const result = describeTestResult(testResult);
+  const brand = vendorBrand(profile.name, profile.baseUrl);
 
   const handleDelete = async () => {
     // 删除会一并丢失该供应商保存的 API key，属于不可逆操作，必须确认
@@ -26,14 +28,20 @@ export default function ProviderCard({ profile, isActive, testResult, api, onEdi
 
   return (
     <div className={`card${isActive ? ' is-active' : ''}`} onClick={() => api.activate(profile.id)}>
-      <div className="card-radio"></div>
-
       <div className="card-body">
-        <div className="card-title">
-          <span>{profile.name}</span>
-          {isActive && <span className="badge">使用中</span>}
+        <div className="card-head">
+          {/* 纯装饰：品牌信息在紧邻的名称里已经有了，读屏再念一遍只是噪音 */}
+          <span className="vendor-logo" style={{ background: brand.color }} aria-hidden="true">
+            {brand.initial}
+          </span>
+          <div className="card-title">
+            <span>{profile.name}</span>
+            {isActive && <span className="badge">使用中</span>}
+          </div>
+          <div className="card-url" title={profile.baseUrl}>
+            {profile.baseUrl}
+          </div>
         </div>
-        <div className="card-url">{profile.baseUrl}</div>
 
         <ModelPicker profile={profile} api={api} />
 

@@ -148,6 +148,15 @@ export default function ModelPicker({ profile, api }: Props) {
   const managed = new Set(fields.map((f) => f.name));
   const extras = Object.keys(map).filter((k) => !managed.has(k));
 
+  // 读不到源模型名时给一条出路。读 Claude Code 配置失败**不进缓存**，
+  // 所以点一下就是一个新的读取，不需要重启应用。
+  const showRetry = namesChecked && fields.length === 0;
+
+  // 建议、备注、状态三样挤在同一行里（见 style.css 的 .card-meta）。
+  // 必须有内容才渲染这一行 —— 空的 flex 容器会凭 gap 白顶出 5px，
+  // 而这张卡片很可能什么可说的都没有。
+  const hasMeta = suggestions.length > 0 || extras.length > 0 || status.text !== '' || showRetry;
+
   return (
     <div className="card-models" onClick={(e) => e.stopPropagation()}>
       <div className="card-model-rows">
@@ -167,40 +176,48 @@ export default function ModelPicker({ profile, api }: Props) {
         ))}
       </div>
 
-      <div className="card-model-hints">
-        {suggestions.map(({ field, guess }) => (
-          <button
-            key={field.name}
-            className="model-suggest"
-            type="button"
-            onClick={() => {
-              const next = { ...map, [field.name]: guess };
-              setMap(next);
-              setStatus({ text: '已保存', warn: false });
-              persist(next);
-            }}
-          >
-            {field.label}：建议 {guess}
-          </button>
-        ))}
-      </div>
+      {hasMeta && (
+        <div className="card-meta">
+          {suggestions.length > 0 && (
+            <div className="card-model-hints">
+              {suggestions.map(({ field, guess }) => (
+                <button
+                  key={field.name}
+                  className="model-suggest"
+                  type="button"
+                  onClick={() => {
+                    const next = { ...map, [field.name]: guess };
+                    setMap(next);
+                    setStatus({ text: '已保存', warn: false });
+                    persist(next);
+                  }}
+                >
+                  {field.label}：建议 {guess}
+                </button>
+              ))}
+            </div>
+          )}
 
-      {extras.length > 0 && (
-        <div className="card-note">
-          另有 {extras.length} 条手动规则：{extras.join('，')}
+          {extras.length > 0 && (
+            <div className="card-note">
+              另有 {extras.length} 条手动规则：{extras.join('，')}
+            </div>
+          )}
+
+          <div className={`card-model-status${status.warn ? ' is-warn' : ''}`}>
+            {status.text}
+            {showRetry && (
+              <button
+                className="card-retry"
+                type="button"
+                onClick={() => setNamesRetry((n) => n + 1)}
+              >
+                重新读取
+              </button>
+            )}
+          </div>
         </div>
       )}
-
-      <div className={`card-model-status${status.warn ? ' is-warn' : ''}`}>
-        {status.text}
-        {/* 读不到源模型名时给一条出路。读 Claude Code 配置失败**不进缓存**，
-            所以点一下就是一个新的读取，不需要重启应用。 */}
-        {namesChecked && fields.length === 0 && (
-          <button className="card-retry" type="button" onClick={() => setNamesRetry((n) => n + 1)}>
-            重新读取
-          </button>
-        )}
-      </div>
     </div>
   );
 }
