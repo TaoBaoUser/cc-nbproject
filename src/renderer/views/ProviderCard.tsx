@@ -1,6 +1,7 @@
 import ModelPicker from '../components/ModelPicker';
 import { describeTestResult } from '../describe';
 import { vendorBrand } from '../vendor-brand';
+import type { CSSProperties } from 'react';
 import type { Profile, TestResult } from '../types';
 import type { ProfilesApi } from '../hooks/useProfiles';
 
@@ -31,7 +32,13 @@ export default function ProviderCard({ profile, isActive, testResult, api, onEdi
       <div className="card-body">
         <div className="card-head">
           {/* 纯装饰：品牌信息在紧邻的名称里已经有了，读屏再念一遍只是噪音 */}
-          <span className="vendor-logo" style={{ background: brand.color }} aria-hidden="true">
+          {/* 品牌色经 CSS 变量传入，不写 inline background —— 这样激活态能用
+              普通 class 规则覆盖成白底蓝字，不必上 !important */}
+          <span
+            className="vendor-logo"
+            style={{ '--vendor-color': brand.color } as CSSProperties}
+            aria-hidden="true"
+          >
             {brand.initial}
           </span>
           <div className="card-title">

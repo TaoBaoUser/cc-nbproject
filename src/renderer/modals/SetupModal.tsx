@@ -177,7 +177,16 @@ export default function SetupModal({ onClose, onTakeover }: Props) {
               <tr key={change.key}>
                 <td>{change.key}</td>
                 <td className="diff-from">{change.from || '（未设置）'}</td>
-                <td className="diff-to">{change.to}</td>
+                {/*
+                  diff-hero 只给 ANTHROPIC_BASE_URL 这一行：接管后所有请求
+                  都发往这个地址，它是用户在这个弹窗里唯一需要确认的那件事，
+                  因此是全弹窗唯一一处放大到 18px 的字号越级（详见 style.css）。
+                */}
+                <td
+                  className={change.key === 'ANTHROPIC_BASE_URL' ? 'diff-to diff-hero' : 'diff-to'}
+                >
+                  {change.to}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -4,26 +4,51 @@
  */
 
 :root {
-  /* 近黑色阶 —— Linear 的底。刻意不用纯黑，留一点冷调。 */
-  --bg: #0c0d0e;
-  --bg-sidebar: #0a0b0c;
-  --bg-elevated: #131416;
-  --bg-hover: #191a1d;
+  /*
+   * 告诉浏览器这套界面是深色的。不写这一行，Chromium 会按浅色渲染**所有原生控件**
+   * —— 弹窗正文那条滚动条会是亮白的一条，贴在全黑弹窗右缘像一道缝。
+   * （这才是它的唯一作用：我们自己的背景色全部是显式写的，不依赖它。）
+   */
+  color-scheme: dark;
+
+  /*
+   * 近黑色阶 —— 与 pen 画布 B1/B2/B3 对齐，比上一版再深一档。
+   * 页面底压到 #060709 是为了给主区那片蓝辉光留出衰减空间：
+   * 底不够黑，辉光一铺整页就发灰。
+   */
+  --bg: #060709;
+  --bg-sidebar: #040506;
+  --bg-elevated: #101216;
+  --bg-card: #0e1013;
+  --bg-hover: #1d2025;
   --bg-sunken: #08090a;
 
   /* 边线极淡：层次主要由色阶承担，不靠画框 */
-  --border: #1e2023;
-  --border-strong: #2b2d31;
+  --border: #23262b;
+  --border-strong: #33373e;
+  /* 卡片描边比 --border 再亮一档：面板要自己勾出边界 */
+  --card-border: #23282f;
 
-  --text: #ececee;
-  --text-dim: #85888f;
-  --text-faint: #5c5f66;
+  --text: #f0f1f3;
+  --text-dim: #9ba1ab;
+  --text-faint: #7b818c;
 
   --accent: #6e7bf2;
   --accent-bright: #8490f5;
   --accent-dim: #363b6e;
   --accent-soft: rgba(110, 123, 242, 0.1);
   --accent-glow: rgba(110, 123, 242, 0.45);
+
+  /*
+   * 画布主蓝。导航选中、激活卡片、主按钮统一用它 ——
+   * 和 --accent 的紫是两回事：紫继续做「提示」（模型映射、备注），
+   * 蓝只做「当前」这一个状态。
+   */
+  --blue: #4d6bfe;
+  --blue-light: #8ba1ff;
+  --blue-deep: #6478ec;
+  /* 蓝底上的文字。蓝的明度高，压在上面的字必须是深的才读得清 */
+  --on-blue: #0a0f2e;
 
   --success: #4ade80;
   --danger: #f87171;
@@ -128,35 +153,48 @@ code,
 }
 
 /*
- * 选中态用中性白底，紫色只留给左竖条。
- * 紫色一旦既做填充又做指示，就会和卡片激活态抢焦点，整页变花。
+ * 选中态是一块实心蓝（pen 画布 B1）。与上一版的「中性白底 + 紫竖条」相反：
+ * 这里蓝色既做填充又做指示 —— 整个界面只有导航这一处回答「你在哪」，
+ * 没有第二个同量级的信号可抢，因此不必让位给竖条。
+ * 卡片激活态用的是同一块蓝的渐变版，两处是一套语汇。
  */
 .nav-item.is-active {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+  background: var(--blue);
+  color: var(--on-blue);
   font-weight: 500;
 }
 
 .nav-item.is-active svg {
   opacity: 1;
-  color: var(--accent-bright);
+  color: var(--on-blue);
 }
 
-/* 左侧短竖条：和卡片激活态的紫竖条用同一套语言 */
+/* 蓝块内侧的白色短竖条（画布上是一条 3×21 的白条） */
 .nav-item.is-active::before {
   content: '';
   position: absolute;
   left: 0;
   top: 8px;
   bottom: 8px;
-  width: 2px;
+  width: 3px;
   border-radius: 0 2px 2px 0;
-  background: var(--accent);
+  background: #fff;
 }
 
 .main {
   overflow-y: auto;
   padding: 24px 28px 48px;
+  /*
+   * 左上角一片蓝辉光，取自 pen 画布的 radial 层：
+   * center 26%/30%、size 135%、三档透明度全部照抄，别凭观感调 ——
+   * 它和标题、卡片网格的位置是一起排的。
+   */
+  background: radial-gradient(
+    135% 135% at 26% 30%,
+    rgba(77, 107, 254, 0.24),
+    rgba(77, 107, 254, 0.08) 45%,
+    rgba(77, 107, 254, 0) 100%
+  );
 }
 
 .view {
@@ -175,10 +213,15 @@ code,
   margin-bottom: 18px;
 }
 
+/*
+ * 页面标题是主区唯一一次字号越级：40px，其余一切退到 11–13px。
+ * 收字距是因为中文在这个字重下字面之间会散开。
+ */
 h1 {
-  font-size: 20px;
-  font-weight: 650;
-  letter-spacing: -0.2px;
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: -1.2px;
+  line-height: 1.15;
 }
 
 .view-sub {
@@ -264,6 +307,18 @@ h1 {
   color: var(--text-dim);
 }
 
+/*
+ * 弹窗正文里的说明（凭证脚注、错误分支的提示）归到和 .field-hint 同一档暗度。
+ * 不直接改 .hint 是因为它在 .proxy-card 里也在用，那处的层次是另一套。
+ * pre-line 是补一个既有缺陷：JSX 里用 {'\n'} 写的断行，默认 white-space
+ * 下会被折叠成空格 —— 「模型相关的配置项一概不动」本该是单独一行。
+ */
+.modal-body .hint {
+  color: #7b818c;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
 .proxy-card .hint {
   margin-bottom: 9px;
 }
@@ -272,7 +327,8 @@ h1 {
 
 .btn {
   padding: 6px 12px;
-  border: 1px solid var(--border-strong);
+  /* 默认描边压到最淡的一档，hover 才提到 --border-strong（画布上的 #33373e） */
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-elevated);
   color: var(--text);
@@ -288,7 +344,7 @@ h1 {
 
 .btn:hover {
   background: var(--bg-hover);
-  border-color: #3a3d43;
+  border-color: var(--border-strong);
 }
 
 .btn:disabled {
@@ -296,15 +352,20 @@ h1 {
   cursor: not-allowed;
 }
 
+/*
+ * 主按钮是白的，不是蓝的（pen 画布 B1「添加供应商」）。
+ * 蓝已经用在导航选中和激活卡片两处，主按钮再用蓝就三处同色、分不出主次；
+ * 白是这套配色里明度最高的一块，正好落在「唯一的主操作」上。
+ */
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: #eceef2;
+  border-color: #eceef2;
+  color: #0a0b0d;
 }
 
 .btn-primary:hover {
-  background: var(--accent-bright);
-  border-color: var(--accent-bright);
+  background: #fff;
+  border-color: #fff;
 }
 
 .btn-ghost {
@@ -367,9 +428,10 @@ h1 {
   display: flex;
   align-items: flex-start;
   padding: 12px 13px;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  background: var(--bg-elevated);
+  border: 1px solid var(--card-border);
+  /* 8 而非 --radius(6)：卡片在画布上是独立面板，圆角比全局控件大一档 */
+  border-radius: 8px;
+  background: var(--bg-card);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.025),
     0 1px 2px rgba(0, 0, 0, 0.3);
@@ -399,14 +461,19 @@ h1 {
   background: rgba(255, 255, 255, 0.22);
 }
 
+/*
+ * 激活卡片是一整块蓝渐变（pen 画布 B1 的 DeepSeek）：
+ * 从 #8ba1ff 到 #6478ec，左亮右深。底够亮，所以卡片里所有文字、
+ * 连模型输入框一起，全部反过来用深色（--on-blue）—— 见下面各处覆盖。
+ * 圆角提到 12：激活态要明显区别于未激活的 8，只靠颜色不够，轮廓也得变一档。
+ */
 .card.is-active {
-  border-color: rgba(110, 123, 242, 0.22);
-  background:
-    linear-gradient(90deg, rgba(110, 123, 242, 0.18), rgba(110, 123, 242, 0) 42%),
-    var(--bg-elevated);
+  border-color: rgba(77, 107, 254, 0.4);
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--blue-light), var(--blue-deep));
 }
 
-/* 左紫条带辉光 —— 激活态的第一眼信号 */
+/* 蓝底上的白色短竖条，与导航选中态同一条语言 */
 .card.is-active::before {
   content: '';
   position: absolute;
@@ -415,8 +482,7 @@ h1 {
   bottom: 9px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--accent-glow);
+  background: #fff;
 }
 
 .card-body {
@@ -440,13 +506,22 @@ h1 {
   align-items: center;
   justify-content: center;
   border-radius: 7px;
-  background: var(--brand, var(--bg-hover));
+  /* 品牌色由组件以 --vendor-color 传进来，不写成 inline background ——
+     写 inline 就得用 !important 才能被下面那条激活态覆盖 */
+  background: var(--vendor-color, var(--bg-hover));
   color: #fff;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: -0.2px;
   /* 近黑底的品牌色在深色界面里会糊进背景，靠一条内描边把边界勾出来 */
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+/* 激活卡片上换成白底 + 蓝首字母（画布 B1）—— 深色品牌块压在亮蓝上会脏 */
+.card.is-active .vendor-logo {
+  background: #fff;
+  box-shadow: none;
+  color: var(--blue);
 }
 
 /* 未激活的标题压暗一档，悬停/激活提亮 —— 层次靠明度差，不靠字号撑。
@@ -472,9 +547,13 @@ h1 {
   white-space: nowrap;
 }
 
-.card:hover .card-title,
-.card.is-active .card-title {
+.card:hover .card-title {
   color: var(--text);
+}
+
+/* 激活卡片上的一切文字反过来用深色 —— 底是亮蓝，白字在渐变右端会糊掉 */
+.card.is-active .card-title {
+  color: var(--on-blue);
 }
 
 .badge {
@@ -486,6 +565,12 @@ h1 {
   color: #fff;
   letter-spacing: 0.2px;
   box-shadow: 0 0 10px rgba(110, 123, 242, 0.35);
+}
+
+/* 激活卡片的徽章反过来：底色用深蓝、去掉辉光（画布 B1 的「使用中」） */
+.card.is-active .badge {
+  background: var(--on-blue);
+  box-shadow: none;
 }
 
 .card-url {
@@ -503,7 +588,7 @@ h1 {
 }
 
 .card.is-active .card-url {
-  color: var(--text-dim);
+  color: var(--on-blue);
 }
 
 /* 操作按钮浮现在右上角，正好压在地址上 —— 悬停/聚焦时把地址让出去 */
@@ -652,16 +737,23 @@ h1 {
 
 .stat {
   padding: 14px 16px;
-  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  /* 10 而非 --radius(6)：和供应商卡片一样，独立面板的圆角比全局控件大一档 */
+  border-radius: 10px;
   background: var(--bg-elevated);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
+/*
+ * 统计数字是全页最大的字号（画布 B3 的 44/900）。
+ * 全屏只有这一处数字承担「一眼看到量级」的职责，其余一律 11–13px ——
+ * 字号越级只允许发生一次，多一处就等于哪一处都不突出。
+ */
 .stat-value {
-  font-size: 26px;
-  font-weight: 600;
+  font-size: 44px;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.4px;
+  letter-spacing: -1.2px;
 }
 
 .stat-label {
@@ -728,9 +820,16 @@ h1 {
   color: var(--text);
 }
 
+/* 原生复选框：不指定 accent-color，Chromium 会在近黑底上给一个纯白方块，
+   比旁边 12px 的文字亮一大截，抢走整行的注意力（画布 B2 用的是品牌蓝） */
+.toggle input[type='checkbox'] {
+  /* 画布 B2 的复选框蓝比主蓝 --blue 更亮一档（#5a74f5 vs #4d6bfe），照抄画布而非复用变量 */
+  accent-color: #5a74f5;
+}
+
 .select {
   padding: 6px 10px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-elevated);
   color: var(--text);
@@ -741,8 +840,12 @@ h1 {
 .empty {
   padding: 44px;
   text-align: center;
+  /* 虚线而非画布上的实线：pen.dev 的 stroke 没有 dash 参数，画不出虚线。
+     空态框的语义是「这里暂时没东西」，虚线比实线更准，所以这处不照抄画布。 */
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
+  /* 压暗一档表示「非内容区」，否则空态框会和真卡片一样亮 */
+  background: rgba(0, 0, 0, 0.3);
   color: var(--text-dim);
 }
 
@@ -789,15 +892,23 @@ h1 {
   display: flex;
   flex-direction: column;
   width: 100%;
-  /* 640 而不是 560：对照表里最长的两格（35 字符 URL + 32 位凭证）
-     在 560 下放不下，会被硬断成两行，逐项对照的关系就断了 */
-  max-width: 640px;
-  max-height: 84vh;
+  /* 700 而不是 560：对照表的账是这么算的 —— 三列各自都要放得下，
+     20 字符的键名要 200px、34 字符的 URL 要 154px、21 字符的本地地址
+     在 18px 下要 290px，合计刚好 644（= 700 减去左右各 28 的版心）。
+     640 下必然有一列折行，逐项对照的关系就断了。 */
+  max-width: 700px;
+  /*
+   * ⚠️ 不能用 84vh：1120×728 下 84% 只有 611px，而弹窗实测内容高约 690px
+   * （标题 + 三条告警 + 目标文件 + 对照表 + 凭证脚注）—— 底部操作栏会被切掉，
+   * 主操作「确认接管」重新变得不可见，正是三段式改造要消灭的那个 P0。
+   * 跟随可视高减去 .modal-root 的 24px 上下内边距。
+   */
+  max-height: calc(100vh - 48px);
   padding: 0;
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  background: var(--bg-elevated);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  border-radius: 14px;
+  background: #0e1014;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.95);
 }
 
 .modal-head {
@@ -805,8 +916,10 @@ h1 {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 20px 24px 14px;
-  border-bottom: 1px solid var(--border);
+  /* 左 28 与弹窗正文、底部操作栏、主界面主区对齐 —— 版心只留一条。
+     上留白也不比左留白大：原来是 32/24，标题会显得浮在版心之外。 */
+  padding: 28px 28px 20px;
+  border-bottom: 1px solid #ffffff14;
 }
 
 /* 标题区吃掉剩余宽度，把关闭按钮顶到最右 */
@@ -815,10 +928,18 @@ h1 {
   min-width: 0;
 }
 
+/*
+ * 弹窗标题是全屏唯一一次字号越级：38px，其余一切退到 11–13px。
+ * 页面级标题是 20px，这里刻意压过它 —— 这个弹窗里用户要做一次
+ * 不可逆的写操作，标题的分量得配得上。
+ * 字距 -1.2px 是中文在大字重下必要的收拢，否则字面之间会散开。
+ */
 .modal h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -1.2px;
+  line-height: 1.5;
+  margin-bottom: 8px;
 }
 
 /* 关闭按钮。刻意不放进 .modal-actions：e2e 按文本遍历那里的 button。 */
@@ -850,9 +971,13 @@ h1 {
   color: var(--text);
 }
 
+/* 副标题是「小 + 疏 + 暗」那一档：字号降一档、字距加一档、明度降两档。
+   四件事一起做才读得成「标题的注脚」，否则就是另一段正文。 */
 .modal .modal-sub {
-  font-size: 12.5px;
-  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  line-height: 1.5;
+  color: #7b818c;
 }
 
 /* 正文：唯一可滚动的部分 */
@@ -860,25 +985,35 @@ h1 {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 24px 4px;
+  padding: 18px 28px 20px;
 }
 
 .field {
   margin-bottom: 15px;
 }
 
+/* 标签是四档明度阶梯里最亮的一档（#9ba1ab）：比它暗的是「说明」和
+   「被替换掉的旧值」（都是 #7b818c），比它亮的是「要落地的新值」（#f0f1f3）。
+   加 500 字重是因为 11px 在深色底上 normal 会发虚。 */
 .field label {
   display: block;
-  font-size: 12.5px;
-  margin-bottom: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  color: #9ba1ab;
+  margin-bottom: 6px;
 }
 
+/* 输入框在深色底上要比卡片还暗（#0a0c10 < --bg #0c0d0e）：它是个「凹陷」，
+   光标落进去的地方不该和周围一个平面。竖直内边距交给 height 定死 40px，
+   三个输入框因此绝对等高 —— 原来 9px 上下 + 13px 行高会随字体回退微抖。 */
 .field input {
   width: 100%;
-  padding: 9px 12px;
-  border: 1px solid var(--border);
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #ffffff14;
   border-radius: 8px;
-  background: var(--bg);
+  background: #0a0c10;
   color: var(--text);
   font: inherit;
   font-size: 13px;
@@ -897,9 +1032,9 @@ h1 {
 .field .textarea {
   width: 100%;
   padding: 9px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid #ffffff14;
   border-radius: 8px;
-  background: var(--bg);
+  background: #0a0c10;
   color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
@@ -908,10 +1043,13 @@ h1 {
   min-height: 76px;
 }
 
+/* 说明文字归到「暗」那一档（#7b818c），与旧值、副标题同一级；
+   行高 1.5 是因为它是唯一会折行的辅助文字，1.2 下两行会挤成一块。 */
 .field .field-hint {
   font-size: 11.5px;
-  color: var(--text-dim);
-  margin-top: 4px;
+  color: #7b818c;
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 /*
@@ -942,15 +1080,21 @@ h1 {
   margin-bottom: 15px;
 }
 
+/* 顶边线用的是和 .modal-head 同一条 #ffffff14 —— 这一行是「表单到此为止、
+   下面换一个话题」的分界，不是又一段普通文字，所以给它结构而不是颜色。
+   文字色取 #c9ccd2（比标签亮一档、比正文暗一档）：它是个控件，得看着能点，
+   但不能亮过底部的「保存」——那不成了主操作。 */
 .advanced > summary {
-  font-size: 12.5px;
-  color: var(--text-dim);
+  font-size: 13px;
+  color: #c9ccd2;
+  padding-top: 12px;
+  border-top: 1px solid #ffffff14;
   cursor: pointer;
   user-select: none;
 }
 
 .advanced > summary:hover {
-  color: var(--text);
+  color: #f0f1f3;
 }
 
 .advanced .field {
@@ -988,6 +1132,12 @@ h1 {
   color: var(--text-faint);
 }
 
+/* 激活卡片蓝底上，「主模型」标签用灰白而非灰 —— 灰 #9ba1ab 压在亮蓝底上
+   对比度只有 1.07:1，糊成一片黑；灰白靠色相差拉开，才读得清 */
+.card.is-active .card-model-label {
+  color: var(--text);
+}
+
 /*
  * 输入框用等宽字体：这里填的是模型 ID（`deepseek/deepseek-v4-pro`），
  * 比例字体下 `l`、`1`、`I` 难以分辨，而填错一个字符就是 400。
@@ -1018,6 +1168,20 @@ h1 {
   border-color: var(--accent);
   background: var(--bg);
   box-shadow: 0 0 0 3px rgba(110, 123, 242, 0.12);
+}
+
+/* 激活卡片上的模型输入框：底压深、描边加深，文字用灰白而非 --on-blue ——
+   深色字压在 rgba(0,0,0,0.2) 的暗底上会糊成一片黑；灰 #9ba1ab 压在上面
+   对比度也只有 1.44:1，同样读不清，灰白 #f0f1f3 能拉到 3.3:1 */
+.card.is-active .card-model-row input {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+}
+
+/* 占位「原样透传」跟着用同一档灰白，别让 Chromium 默认色跟输入值深浅不一 */
+.card.is-active .card-model-row input::placeholder {
+  color: var(--text);
 }
 
 /*
@@ -1142,6 +1306,11 @@ h1 {
   color: var(--accent);
 }
 
+/* 激活卡片上的展开箭头用灰白，与输入框文字一致 */
+.card.is-active .combobox-toggle {
+  color: var(--text);
+}
+
 /* max-height 240 与 Combobox.tsx 的 LIST_MAX_HEIGHT 是同一个数，
    冒烟检查按它对浮层高度和展开方向做判定，改一边必须改另一边 */
 .combobox-list {
@@ -1204,8 +1373,10 @@ h1 {
   display: flex;
   justify-content: flex-end;
   gap: 9px;
-  padding: 14px 24px 18px;
-  border-top: 1px solid var(--border);
+  /* 左右 28 与弹窗头、正文同一条版心线；上 18 下 28 让底部比顶部松一点，
+     视线落到这里时是「结束」而不是「又一个区块」。 */
+  padding: 18px 28px 28px;
+  border-top: 1px solid #ffffff14;
 }
 
 .error-text {
@@ -1230,45 +1401,90 @@ h1 {
 
 /* 改动对照表（引导流程用） */
 /*
- * table-layout:fixed 是必须的。auto 布局下，ANTHROPIC_AUTH_TOKEN 行的
- * 「将改为」列里那串 64 字符的本地准入凭证会把该列撑到最宽，另外两列被挤变形，
- * ANTHROPIC_BASE_URL 这种长键名会断成两行。固定布局让三列按下面的比例分配，
- * 超长内容靠 word-break 在列内折行。
+ * 这张表要读成一张印刷对照表，不是「几行数据」。全表只有三条水平线
+ * ——表头下一条、每行之间一条——四边不封口，和正文一样落在版心里。
+ *
+ * 表头去掉底色也是为此：有底色就成了「一个区块」，无底色才是一行栏目名。
  */
 .diff-table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  margin: 6px 0 14px;
-  font-size: 12px;
+  margin: 4px 0 16px;
 }
 
+/*
+ * table-layout:fixed 是必须的。auto 布局下，ANTHROPIC_AUTH_TOKEN 行的
+ * 「将改为」列里那串 64 字符的本地准入凭证会把该列撑到最宽，另外两列被挤变形，
+ * ANTHROPIC_BASE_URL 这种长键名会断成两行。
+ *
+ * 三列宽度按 200 / 154 / 288 设计。这个总和不是凑出来的：版心 642
+ * （= 700 的 max-width 减去左右各 1px 边框、再减左右各 28 内边距），
+ * 200 + 154 + 288 正好用尽，一列都不多。
+ *
+ * 写成百分比而不是 px：用 px 的话窗口一窄整个表就横向溢出，
+ * 百分比是把同一套比例交给浏览器按可用宽度缩放。
+ *
+ * 288 是第三列的下限推出来的：接管后那行「将改为」是本机代理地址，
+ * 21 个字符在 18px 等宽下要 21×18×0.671 ≈ 254px，加左右各 12 内边距 = 278。
+ * 288 留了 10px 余量；再窄就会折行，逐项对照的关系就断了。
+ */
 .diff-table th:nth-child(1) {
-  width: 31%;
+  width: 31.15%; /* 200 / 642 */
 }
 .diff-table th:nth-child(2) {
-  width: 30%;
+  width: 23.99%; /* 154 / 642 */
 }
 .diff-table th:nth-child(3) {
-  width: 39%;
+  width: 44.86%; /* 288 / 642 */
 }
 
+/* 三条水平线都在这里：表头一条、每个单元格一条底边（相邻行共用）。
+   单元格不加左右边线 —— 竖线全表只有一条，就是下面那条列分隔线。 */
 .diff-table th,
 .diff-table td {
-  padding: 7px 10px;
-  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-bottom: 1px solid #ffffff14;
   text-align: left;
   vertical-align: top;
   word-break: break-all;
 }
 
 .diff-table th {
-  background: var(--bg);
-  color: var(--text-dim);
+  color: #7b818c;
+  font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.4px;
 }
 
-/* 两列值都是配置字符串（地址、凭证），等宽字体让 token 的折行位置可数 */
+/*
+ * 全弹窗唯一一块面，落在「将改为」整列（表头也一起填，这样从表头到最后一行
+ * 是一整条，不是一个方块一个方块）。
+ * 左边那条竖线是同一件事的另一半：它把「现在 | 将来」劈开，
+ * 是全表唯一一条竖线，也是整个弹窗唯一一条竖线 —— 线条在这里是信息。
+ */
+.diff-table th:nth-child(3),
+.diff-table td:nth-child(3) {
+  background: #ffffff0f;
+  border-left: 1px solid #ffffff2e;
+}
+
+/*
+ * 键名是配置键，属于代码，走等宽。
+ * 200px 的列宽就是按它定的：最长的 ANTHROPIC_AUTH_TOKEN 20 个字符，
+ * 13px 等宽下 20×13×0.671 ≈ 174px，加左右各 12 内边距 = 198，刚好装进 200。
+ * 换成比例字体这列看着会"松"，而且和右边的等宽值对不齐。
+ */
+.diff-table tbody td:nth-child(1) {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+/*
+ * 两列值都是配置字符串（地址、凭证），等宽字体让 token 的折行位置可数。
+ * 旧值给 #7b818c 而不是红：这里是「将被替换掉的值」，不是「错误」。
+ * 让它安静下去，比给它一个告警色更准 —— 红会让人以为出了故障。
+ */
 .diff-table .diff-from,
 .diff-table .diff-to {
   font-family: var(--mono);
@@ -1277,30 +1493,50 @@ h1 {
 }
 
 .diff-from {
-  color: var(--danger);
+  color: #7b818c;
 }
 
 .diff-to {
-  color: var(--success);
+  color: #f0f1f3;
 }
 
+/*
+ * 全屏唯一一次字号越级：接管后要写进配置的本机代理地址。
+ * 其余一切在 11px，只有它 18px —— 用户在这个弹窗里只需要确认一件事，
+ * 就是「地址会变成这个」，那就让它大到一眼看见。
+ * （SetupModal 只把这个类给 ANTHROPIC_BASE_URL 那一行。）
+ */
+.diff-to.diff-hero {
+  font-size: 18px;
+  line-height: 1.35;
+  letter-spacing: -0.2px;
+}
+
+/*
+ * 提示条用左竖线标记，和对照表那条竖线共用同一套语汇。
+ * 去掉四边框和底色：带底色的一块是「装饰」，一条线才是「标记」——
+ * 而且正文每多一个色块，上面那块「将改为」的面就不唯一了。
+ */
 .notice {
-  padding: 11px 14px;
-  border-radius: var(--radius);
+  padding: 2px 0 2px 15px;
   font-size: 12.5px;
   line-height: 1.55;
   margin-bottom: 14px;
-  border: 1px solid;
+  border: 0;
+  border-left: 2px solid;
+  /* 同上：JSX 里的 {'\n'} 得靠 pre-line 才真的断行。用 pre-line 而不是
+     pre-wrap —— 前者折叠多余空格，不会把 JSX 缩进带进来。 */
+  white-space: pre-line;
 }
 
+/* 风险提示是有权保留颜色的：它是语义（要出事），不是「新旧对照」那种装饰。
+   但颜色只留在竖线和文字上，不再铺一块底。 */
 .notice-warn {
-  border-color: rgba(251, 191, 36, 0.4);
-  background: rgba(251, 191, 36, 0.1);
-  color: var(--warning);
+  border-left-color: #f0b45a;
+  color: #f0b45a;
 }
 
 .notice-info {
-  border-color: var(--border);
-  background: var(--bg);
-  color: var(--text-dim);
+  border-left-color: #ffffff2e;
+  color: #7b818c;
 }

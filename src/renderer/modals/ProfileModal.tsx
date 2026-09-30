@@ -114,8 +114,16 @@ export default function ProfileModal({ profile, api, onClose }: Props) {
           </div>
         </div>
 
-        {/* 映射收进「高级」：常规用法是到卡片上选模型，只有下拉覆盖不到的边角情况才需要手写规则 */}
-        <details className="advanced">
+        {/*
+          映射收进「高级」：常规用法是到卡片上选模型，只有下拉覆盖不到的边角情况
+          才需要手写规则，所以默认收起。
+
+          唯一的例外是「本来就有规则」—— 已有映射还收着，等于把用户自己写过的
+          东西藏起来：摘要行会写「已有 3 条」却看不到是哪 3 条，而下面那条
+          「留空则不启用映射」的说明还会让人误以为删空了就等于没配过。
+          编辑场景默认展开，新建场景（mapCount === 0）仍旧收起。
+        */}
+        <details className="advanced" open={mapCount > 0}>
           <summary>
             {mapCount > 0 ? `高级：手动映射规则（已有 ${mapCount} 条）` : '高级：手动映射规则'}
           </summary>
